@@ -4,14 +4,24 @@
 \alias{enumerate_items}
 \title{Enumerates the elements of a vector}
 \usage{
-enumerate_items(x, type, verb = FALSE, s = FALSE, past = FALSE,
-  or = FALSE, start_verb = FALSE, quote = FALSE, enum = FALSE,
-  nmax = 7)
+enumerate_items(
+  x,
+  type,
+  verb = FALSE,
+  s = FALSE,
+  past = FALSE,
+  or = FALSE,
+  start_verb = FALSE,
+  quote = FALSE,
+  enum = FALSE,
+  other = "",
+  nmax = 7
+)
 }
 \arguments{
 \item{x}{A vector.}
 
-\item{type}{A single character string, optional. If this argument is used, it supersedes all other arguments. It compactly provides the arguments of the function: it must be like \code{"arg1.arg2.arg3"}, i.e. a list of arguments separated by a point. The arguments are: "s" (to add a starting s if \code{length(x)>1}), "or" (to have "or" instead of "and"), "start" (to place the verb at the start instead of in the end), "quote" (to quote the elements of the vector), "enum" (to make an enumeration), "past" (to put the verb in past tense), a verb (i.e. anything different from the previous codes is a verb). See details and examples.}
+\item{type}{A single character string, optional. If this argument is used, it supersedes all other arguments. It compactly provides the arguments of the function: it must be like \code{"arg1.arg2.arg3"}, i.e. a list of arguments separated by a point. The arguments are: "s" (to add a starting s if \code{length(x)>1}), "or" (to have "or" instead of "and"), "start" (to place the verb at the start instead of in the end), "quote" (to quote the elements of the vector), "enum" (to make an enumeration), "past" (to put the verb in past tense), a verb (i.e. anything different from the previous codes is a verb). Use \code{other(XX)} to set the argument \code{other} to \code{XX}. See details and examples.}
 
 \item{verb}{Default is \code{FALSE}. If provided, a verb is added at the end of the string, at the appropriate form. You add the verb at the start of the string using the argument \code{start_verb}. Valid verbs are: "be", "is", "has", "have", and any other verb with a regular form.}
 
@@ -26,6 +36,8 @@ enumerate_items(x, type, verb = FALSE, s = FALSE, past = FALSE,
 \item{quote}{Logical, default is \code{FALSE}. If \code{TRUE} all items are put in between single quotes.}
 
 \item{enum}{Logical, default is \code{FALSE}. If provided, an enumeration of the items of \code{x} is created. The possible values are "i", "I", "1", "a" and "A". Example: \code{x = c(5, 3, 12)}, \code{enum = "i"} will lead to "i) 5, ii) 3, and iii) 12".}
+
+\item{other}{Character scalar, defaults to the empty string: \code{""}. If there are more than \code{nmax} elements, then the character string will end with \code{"and XX others"} with \code{XX} the number of remaining items. Use this argument to change what is between the \code{and} and the \code{XX}. E.g. if \code{other = "any of"}, then you would get \code{"... and any of 15 others"} instead of \code{"... and 15 others"}.}
 
 \item{nmax}{Integer, default is 7. If \code{x} contains more than \code{nmax} items, then these items are grouped into an "other" group.}
 }

@@ -4,19 +4,26 @@
 \alias{validate_dots}
 \title{Checks the arguments in dots from methods}
 \usage{
-validate_dots(valid_args = c(), suggest_args = c(), message = TRUE,
-  warn = FALSE, stop = FALSE, call. = FALSE, immediate. = TRUE)
+validate_dots(
+  valid_args = c(),
+  suggest_args = c(),
+  message,
+  warn,
+  stop,
+  call. = FALSE,
+  immediate. = TRUE
+)
 }
 \arguments{
 \item{valid_args}{A character vector, default is missing. Arguments that are not in the definition of the function but which are considered as valid. Typically internal arguments that should not be directly accessed by the user.}
 
 \item{suggest_args}{A character vector, default is missing. If the user provides invalid arguments, he might not be aware of the main arguments of the function. Use this argument to inform the user of these main arguments.}
 
-\item{message}{Logical, default is \code{TRUE}. If \code{FALSE} (and so are the other arguments \code{stop} and \code{warn}), then no message is prompted to the user, rather it is the only output of the function.}
+\item{message}{Logical, default is \code{FALSE}. If \code{TRUE}, a standard message is prompted to the user (instead of a warning).}
 
-\item{warn}{Logical, default is \code{FALSE}. If \code{TRUE}, when the user provides invalid arguments, the function will call \code{\link[base]{warning}} instead of only prompting a message (default).}
+\item{warn}{Logical, default is \code{TRUE}. If \code{TRUE}, when the user provides invalid arguments, the function will call \code{\link[base]{warning}} (default). If \code{FALSE} (and so are the other arguments \code{stop} and \code{message}), then no message is prompted to the user, rather it is the only output of the function.}
 
-\item{stop}{Logical, default is \code{FALSE}. If \code{TRUE}, when the user provides invalid arguments, the function will call \code{\link[base]{stop}} instead of only prompting a message (default).}
+\item{stop}{Logical, default is \code{FALSE}. If \code{TRUE}, when the user provides invalid arguments, the function will call \code{\link[base]{stop}} instead of prompting a warning (default).}
 
 \item{call.}{Logical, default is \code{FALSE}. If \code{TRUE}, when the user provides invalid arguments, then the message will also contain the call to the initial function (by default, only the function name is shown).}
 
@@ -53,11 +60,11 @@ summary(my_obj, wrong = 3, info = 5)
 # Now let's :
 #   i) inform the user that argument arg_one is the main argument
 #  ii) consider 'info' as a valid argument (but not shown to the user)
-# iii) show a warning instead of a message
+# iii) show a message instead of a warning
 
 summary.my_class = function(object, arg_one, arg_two, ...){
 
-  validate_dots(valid_args = "info", suggest_args = "arg_one", warn = TRUE)
+  validate_dots(valid_args = "info", suggest_args = "arg_one", message = TRUE)
   # CODE of summary.my_class
   invisible(NULL)
 }

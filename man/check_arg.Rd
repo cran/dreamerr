@@ -7,19 +7,71 @@
 \alias{check_value_plus}
 \title{Checks arguments and informs the user appropriately}
 \usage{
-check_arg(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9, ...,
-  .message, .choices = NULL, .data = list(), .value, .env,
-  .call_up = 0)
+check_arg(
+  .x,
+  .type,
+  .x1,
+  .x2,
+  .x3,
+  .x4,
+  .x5,
+  .x6,
+  .x7,
+  .x8,
+  .x9,
+  ...,
+  .message,
+  .choices = NULL,
+  .data = list(),
+  .value,
+  .env,
+  .up = 0
+)
 
-check_arg_plus(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9, ...,
-  .message, .choices = NULL, .data = list(), .value, .env,
-  .call_up = 0)
+check_arg_plus(
+  .x,
+  .type,
+  .x1,
+  .x2,
+  .x3,
+  .x4,
+  .x5,
+  .x6,
+  .x7,
+  .x8,
+  .x9,
+  ...,
+  .message,
+  .choices = NULL,
+  .data = list(),
+  .value,
+  .env,
+  .up = 0
+)
 
-check_value(.x, .type, .message, .arg_name, .choices = NULL,
-  .data = list(), .value, .env, .call_up = 0)
+check_value(
+  .x,
+  .type,
+  .message,
+  .arg_name,
+  .choices = NULL,
+  .data = list(),
+  .value,
+  .env,
+  .up = 0
+)
 
-check_value_plus(.x, .type, .message, .arg_name, .choices = NULL,
-  .data = list(), .value, .env, .call_up = 0)
+check_value_plus(
+  .x,
+  .type,
+  .message,
+  .arg_name,
+  .choices = NULL,
+  .data = list(),
+  .value,
+  .env,
+  .up = 0
+)
 }
 \arguments{
 \item{.x}{An argument to be checked. Must be an argument name. Can also be the type, see details/examples.}
@@ -47,7 +99,7 @@ You can then add optional restrictions: 1) \code{len(a, b)}, i.e. the object sho
 
 \item{...}{Only used to check \code{'...'} (dot-dot-dot) arguments.}
 
-\item{.message}{A character string, optional. By default, if the user provides a wrong argument, the error message stating what type of argument is required is automatically formed. You can alternatively provide your own error message, maybe more tailored to your function. The reason of why there is a problem is appended in the end of the message.}
+\item{.message}{A character string, optional. By default, if the user provides a wrong argument, the error message stating what type of argument is required is automatically formed. You can alternatively provide your own error message, maybe more tailored to your function. The reason of why there is a problem is appended in the end of the message. You can use the special character \code{__ARG__} in the message. If found, \code{__ARG__} will be replaced by the appropriate argument name.}
 
 \item{.choices}{Only if one of the types (in argument \code{type}) is \code{"match"}. The values the argument can take. Note that even if the \code{type} is \code{"match"}, this argument is optional since you have other ways to declare the choices.}
 
@@ -57,7 +109,7 @@ You can then add optional restrictions: 1) \code{len(a, b)}, i.e. the object sho
 
 \item{.env}{An environment defaults to the frame where the user called the original function. Only used in two situations. 1) if the global keywords \code{eval} or \code{evalset} are present: the argument will also be evaluated in this environment. 2) if the argument is expected to be a formula and \code{var(env)} is included in the type: then the formula will be expected to contain variables existing in \code{.env}.}
 
-\item{.call_up}{Integer, default is 0. If the user provides a wrong argument, the error message will integrate the call of the function from which \code{check_arg} has been called. If \code{check_arg} is  called in a non-user level sub function of a main user-level function, then use \code{call_up = 1} to make the error message look like it occured in the main function (and not in the sub function). Of course you can have values higher than 1.}
+\item{.up}{Integer, default is 0. If the user provides a wrong argument, the error message will integrate the call of the function from which \code{check_arg} has been called. If \code{check_arg} is  called in a non-user level sub function of a main user-level function, then use \code{.up = 1} to make the error message look like it occured in the main function (and not in the sub function). Of course you can have values higher than 1.}
 
 \item{.arg_name}{A character scalar. If \code{.message} is not provided, an automatic error message will be generated using \code{.arg_name} as the argument name.}
 }
@@ -191,12 +243,12 @@ It is important to note that in case of multiple arguments, you can place the ty
 If your type is in a variable, then you must explicitly provide the argument \code{.type} (like in \code{check_arg(x, .type = my_type)}).
 }
 
-\section{Nesting argument checking (\code{.call_up})}{
+\section{Nesting argument checking (\code{.up})}{
 
 
 When you develop several functions that share common features, it is usually good practice to pool the common computations into an internal function (to avoid code duplication).
 
-When you do so, you can do all the argument checking in the internal function. Then use the argument \code{.call_up = 1} so that if the user provdes a wrong argument, the error message will refer to the user-level function and NOT to the internal function, making it much clearer for the user.
+When you do so, you can do all the argument checking in the internal function. Then use the argument \code{.up = 1} so that if the user provdes a wrong argument, the error message will refer to the user-level function and NOT to the internal function, making it much clearer for the user.
 
 This is detailed in Section XII) in the examples.
 }
@@ -371,12 +423,12 @@ test_eval = function(x1, x2, data = list(), i = c()){
 
  # We show the variables
  if(1 \%in\% i){
-   cat("x1:\\n")
+   cat("x1:\n")
    print(as.character(try(x1, silent = TRUE)))
  }
 
  if(2 \%in\% i){
-   cat("x2:\\n")
+   cat("x2:\n")
    print(as.character(try(x2, silent = TRUE)))
  }
 
@@ -421,7 +473,7 @@ test_match = function(x1 = c("bonjour", "Au revoir"), x2, x3 = "test"){
   # 3) choices set with the parentheses
   check_arg_plus(x3, "multi match(Orange, Juice, Good)")
 
-  cat("x1:", x1, "\\nx2:", ifelse(missing(x2), "[missing]", x2), "\\nx3:", x3, "\\n")
+  cat("x1:", x1, "\nx2:", tryCatch(x2, error = function(e) "[missing]"), "\nx3:", x3, "\n")
 }
 
 # Everything below is OK
@@ -453,7 +505,7 @@ test_match_multi = function(x1 = c("bonjour", "Au revoir"), x2 = c("Sarah", "San
   # multiple arguments at once
   check_arg_plus(x1, x2, x3, "match")
 
-  cat("x1:", x1, "\\nx2:", x2, "\\nx3:", x3, "\\n")
+  cat("x1:", x1, "\nx2:", x2, "\nx3:", x3, "\n")
 }
 
 test_match_multi()
@@ -473,7 +525,7 @@ test_charin = function(x1 = "bonjour", x2  = "Sarah"){
   # 2) set the choices with the parentheses
   check_arg(x2, "multi charin(Sarah, Santa, Santa Fe)")
 
-  cat("x1:", x1, "\\nx2:", x2, "\\n")
+  cat("x1:", x1, "\nx2:", x2, "\n")
 }
 
 # Now we need the exact values
@@ -837,13 +889,13 @@ test_conv(c(TRUE, FALSE), "vector(logical, character conv)")
 
 
 #
-# XII) Nested checking: using .call_up
+# XII) Nested checking: using .up
 #
 
 # Say you have two user level functions
 # But you do all the computation in an internal function.
 # The error message should be at the level of the user-level function
-# You can use the argument .call_up to do that
+# You can use the argument .up to do that
 #
 
 sum_fun = function(x, y){
@@ -857,7 +909,7 @@ diff_fun = function(x, y){
 my_internal = function(x, y, sum){
   # The error messages will be at the level of the user-level functions
   # which are 1 up the stack
-  check_arg(x, y, "numeric scalar mbt", .call_up = 1)
+  check_arg(x, y, "numeric scalar mbt", .up = 1)
 
   if(sum) return(x + y)
   return(x - y)
@@ -983,17 +1035,17 @@ setDreamerr_dev.mode(TRUE)
 
 # Creating some 'wrong' calls => the problem is pinpointed
 
-test = function(x) check_arg(x, "integer scalar", "numeric vector")
-try(test())
+test_err1 = function(x) check_arg(x, "integer scalar", "numeric vector")
+try(test_err1())
 
-test = function(...) check_arg("numeric vector", ...)
-try(test())
+test_err2 = function(...) check_arg("numeric vector", ...)
+try(test_err2())
 
-test = function(x) check_arg(x$a, "numeric vector")
-try(test())
+test_err3 = function(x) check_arg(x$a, "numeric vector")
+try(test_err3())
 
-test = function(x) check_arg(x, "numeric vector integer")
-try(test())
+test_err4 = function(x) check_arg(x, "numeric vector integer")
+try(test_err4())
 
 # Setting the developer mode off:
 setDreamerr_dev.mode(FALSE)

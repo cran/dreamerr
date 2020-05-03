@@ -109,15 +109,108 @@ setDreamerr_dev.mode = function(dev.mode = FALSE){
 }
 
 
+
+#' Sets argument checking on/off "semi-globally"
+#'
+#' You can allow your users to turn off argument checking within your function by using \code{set_check}. Only the functions \code{\link[dreamerr]{check_arg}} nd \code{\link[dreamerr]{check_value}} can be turned off that way.
+#'
+#' @param x A logical scalar, no default.
+#'
+#' @details
+#' This function can be useful if you develop a function that may be used in large range loops (>100K). In such situations, it may be good to still check all arguments, but to offer the user to turn this checking off with an extra argument (named \code{arg.check} for instance). Doing so you would achieve the feat of i) having a user-friendly function thanks to argument checking and, ii) still achieve high performance in large loops (although the computational footprint of argument checking is quite low [around 30 micro seconds for missing arguments to 80 micro seconds for non-missing arguments of simple type]).
+#'
+#' @examples
+#'
+#' # Let's give an example
+#' test_check = function(x, y, arg.check = TRUE){
+#'   set_check(arg.check)
+#'   check_arg(x, y, "numeric scalar")
+#'   x + y
+#' }
+#'
+#' # Works: argument checking on
+#' test_check(1, 2)
+#'
+#' # If mistake, nice error msg
+#' try(test_check(1, "a"))
+#'
+#' # Now argument checking turned off
+#' test_check(1, 2, FALSE)
+#' # But if mistake: "not nice" error message
+#' try(test_check(1, "a", FALSE))
+#'
+#'
+#'
+set_check = function(x){
+
+  if(isFALSE(x)){
+    assign("DREAMERR_CHECK", FALSE, parent.frame())
+  }
+
+}
+
+
+#' Sets "semi-globally" the 'up' argument of dreamerr's functions
+#'
+#' When \code{\link[dreamerr]{check_arg}} (or \code{\link[dreamerr]{stop_up}}) is used in non user-level functions, the argument \code{.up} is used to provide an appropriate error message referencing the right function.
+#'
+#' To avoid repeating the argument \code{.up} in each \code{check_arg} call, you can set it (kind of) "globally" with \code{set_up}.
+#'
+#' @param .up An integer greater or equal to 0.
+#'
+#' @details
+#' The function \code{set_up} does not set the argument \code{up} globally.
+#'
+#'
+#' @examples
+#'
+#' # Example with computation being made within a non user-level function
+#'
+#' sum_fun = function(x, y){
+#'   my_internal(x, y, sum = TRUE)
+#' }
+#'
+#' diff_fun = function(x, y){
+#'   my_internal(x, y, sum = FALSE)
+#' }
+#'
+#' my_internal = function(x, y, sum){
+#'   set_up(1) # => errors will be at the user-level function
+#'   check_arg(x, y, "numeric scalar mbt")
+#'
+#'   # Identical to calling
+#'   # check_arg(x, y, "numeric scalar mbt", .call_up = 1)
+#'
+#'   if(sum) return(x + y)
+#'   return(x - y)
+#' }
+#'
+#' # we check it works
+#' sum_fun(5, 6)
+#' diff_fun(5, 6)
+#'
+#' # Let's throw some errors
+#' try(sum_fun(5))
+#' try(sum_fun(5, 1:5))
+#'
+set_up = function(.up = 1){
+  if(length(.up) == 1 && is.numeric(.up) && !is.na(.up) && .up == floor(.up) && .up >= 0){
+    assign("DREAMERR__UP", .up, parent.frame())
+  } else {
+    stop("Argument '.up' must be an integer scalar greater or equal to 1. This is currently not the case.")
+  }
+}
+
+
 #' Checks the arguments in dots from methods
 #'
 #' This function informs the user of arguments passed to a method but which are not used by the method.
 #'
 #' @param valid_args A character vector, default is missing. Arguments that are not in the definition of the function but which are considered as valid. Typically internal arguments that should not be directly accessed by the user.
 #' @param suggest_args A character vector, default is missing. If the user provides invalid arguments, he might not be aware of the main arguments of the function. Use this argument to inform the user of these main arguments.
-#' @param stop Logical, default is \code{FALSE}. If \code{TRUE}, when the user provides invalid arguments, the function will call \code{\link[base]{stop}} instead of only prompting a message (default).
-#' @param warn Logical, default is \code{FALSE}. If \code{TRUE}, when the user provides invalid arguments, the function will call \code{\link[base]{warning}} instead of only prompting a message (default).
-#' @param message Logical, default is \code{TRUE}. If \code{FALSE} (and so are the other arguments \code{stop} and \code{warn}), then no message is prompted to the user, rather it is the only output of the function.
+#' @param stop Logical, default is \code{FALSE}. If \code{TRUE}, when the user provides invalid arguments, the function will call \code{\link[base]{stop}} instead of prompting a warning (default).
+#' @param warn Logical, default is \code{TRUE}. If \code{TRUE}, when the user provides invalid arguments, the function will call \code{\link[base]{warning}} (default). If \code{FALSE} (and so are the other arguments \code{stop} and \code{message}), then no message is prompted to the user, rather it is the only output of the function.
+#' @param message Logical, default is \code{FALSE}. If \code{TRUE}, a standard message is prompted to the user (instead of a warning).
 #' @param call. Logical, default is \code{FALSE}. If \code{TRUE}, when the user provides invalid arguments, then the message will also contain the call to the initial function (by default, only the function name is shown).
 #' @param immediate. Logical, default is \code{FALSE}. Can be only used with the argument \code{warn = TRUE}: whether the warning is immediately displayed or not.
 #'
@@ -149,11 +242,11 @@ setDreamerr_dev.mode = function(dev.mode = FALSE){
 #' # Now let's :
 #' #   i) inform the user that argument arg_one is the main argument
 #' #  ii) consider 'info' as a valid argument (but not shown to the user)
-#' # iii) show a warning instead of a message
+#' # iii) show a message instead of a warning
 #'
 #' summary.my_class = function(object, arg_one, arg_two, ...){
 #'
-#'   validate_dots(valid_args = "info", suggest_args = "arg_one", warn = TRUE)
+#'   validate_dots(valid_args = "info", suggest_args = "arg_one", message = TRUE)
 #'   # CODE of summary.my_class
 #'   invisible(NULL)
 #' }
@@ -164,7 +257,7 @@ setDreamerr_dev.mode = function(dev.mode = FALSE){
 #'
 #'
 #'
-validate_dots = function(valid_args = c(), suggest_args = c(), message = TRUE, warn = FALSE, stop = FALSE, call. = FALSE, immediate. = TRUE){
+validate_dots = function(valid_args = c(), suggest_args = c(), message, warn, stop, call. = FALSE, immediate. = TRUE){
   # Function to catch the arguments passing in ...
   # we suggest some principal arguments
 
@@ -179,6 +272,10 @@ validate_dots = function(valid_args = c(), suggest_args = c(), message = TRUE, w
   res = NULL
   if(length(args_invalid) > 0){
 
+    # Default values
+    if(missing(message)) message = FALSE
+    if(missing(stop)) stop = FALSE
+    if(missing(warn)) warn = !isTRUE(message) & !isTRUE(stop)
 
     if(stop == FALSE && warn == FALSE){
       if(call.){
@@ -231,7 +328,7 @@ validate_dots = function(valid_args = c(), suggest_args = c(), message = TRUE, w
 #' Useful if you employ non-user level sub-functions within user-level functions. When an error is thrown in the sub function, the error message will integrate the call of the user-level function, which is more informative and appropriate for the user. It offers a similar functionality for \code{warning}.
 #'
 #' @param ... Objects that will be coerced to character and will compose the error message.
-#' @param up The number of frames up, default is 1. The call in the error message will be based on the function \code{up} frames up the stack. See examples.
+#' @param up The number of frames up, default is 1. The call in the error message will be based on the function \code{up} frames up the stack. See examples. If you have many calls to \code{stop_up}/\code{warn_up} with a value of \code{up} different than one, you can use \code{\link[dreamerr]{set_up}} to change the default value of \code{up} within the function.
 #' @param immediate. Whether the warning message should be prompted directly. Defaults to \code{FALSE}.
 #'
 #' @details
@@ -287,6 +384,13 @@ stop_up = function(..., up = 1){
 
   message = paste0(...)
 
+  # up with set_up
+  mc = match.call()
+  if(!"up" %in% names(mc)){
+    up_value = mget("DREAMERR__UP", parent.frame(), ifnotfound = 1)
+    up = up_value[[1]]
+  }
+
   # The original call
   my_call = deparse(sys.calls()[[sys.nframe() - (1 + up)]])[1] # call can have svl lines
   nmax = 50
@@ -301,6 +405,13 @@ stop_up = function(..., up = 1){
 warn_up = function(..., up = 1, immediate. = FALSE){
 
   message = paste0(...)
+
+  # up with set_up
+  mc = match.call()
+  if(!"up" %in% names(mc)){
+    up_value = mget("DREAMERR__UP", parent.frame(), ifnotfound = 1)
+    up = up_value[[1]]
+  }
 
   # The original call
   my_call = deparse(sys.calls()[[sys.nframe() - (1 + up)]])[1] # call can have svl lines
@@ -319,7 +430,7 @@ warn_up = function(..., up = 1, immediate. = FALSE){
 #' Transforms a vector into a single character string enumerating the values of the vector. Many options exist to customize the result. The main purpose of this function is to ease the creation of user-level messages.
 #'
 #' @param x A vector.
-#' @param type A single character string, optional. If this argument is used, it supersedes all other arguments. It compactly provides the arguments of the function: it must be like \code{"arg1.arg2.arg3"}, i.e. a list of arguments separated by a point. The arguments are: "s" (to add a starting s if \code{length(x)>1}), "or" (to have "or" instead of "and"), "start" (to place the verb at the start instead of in the end), "quote" (to quote the elements of the vector), "enum" (to make an enumeration), "past" (to put the verb in past tense), a verb (i.e. anything different from the previous codes is a verb). See details and examples.
+#' @param type A single character string, optional. If this argument is used, it supersedes all other arguments. It compactly provides the arguments of the function: it must be like \code{"arg1.arg2.arg3"}, i.e. a list of arguments separated by a point. The arguments are: "s" (to add a starting s if \code{length(x)>1}), "or" (to have "or" instead of "and"), "start" (to place the verb at the start instead of in the end), "quote" (to quote the elements of the vector), "enum" (to make an enumeration), "past" (to put the verb in past tense), a verb (i.e. anything different from the previous codes is a verb). Use \code{other(XX)} to set the argument \code{other} to \code{XX}. See details and examples.
 #' @param verb Default is \code{FALSE}. If provided, a verb is added at the end of the string, at the appropriate form. You add the verb at the start of the string using the argument \code{start_verb}. Valid verbs are: "be", "is", "has", "have", and any other verb with a regular form.
 #' @param s Logical, default is \code{FALSE}. If \code{TRUE} a \code{s} is added at the beginning of the string if the length of \code{x} is greater than one.
 #' @param past Logical, default is \code{FALSE}. If \code{TRUE} the verb is put at the past tense.
@@ -327,6 +438,7 @@ warn_up = function(..., up = 1, immediate. = FALSE){
 #' @param start_verb Logical, default is \code{FALSE}. If \code{TRUE} the verb is placed at the beginning of the string instead of the end.
 #' @param quote Logical, default is \code{FALSE}. If \code{TRUE} all items are put in between single quotes.
 #' @param enum Logical, default is \code{FALSE}. If provided, an enumeration of the items of \code{x} is created. The possible values are "i", "I", "1", "a" and "A". Example: \code{x = c(5, 3, 12)}, \code{enum = "i"} will lead to "i) 5, ii) 3, and iii) 12".
+#' @param other Character scalar, defaults to the empty string: \code{""}. If there are more than \code{nmax} elements, then the character string will end with \code{"and XX others"} with \code{XX} the number of remaining items. Use this argument to change what is between the \code{and} and the \code{XX}. E.g. if \code{other = "any of"}, then you would get \code{"... and any of 15 others"} instead of \code{"... and 15 others"}.
 #' @param nmax Integer, default is 7. If \code{x} contains more than \code{nmax} items, then these items are grouped into an "other" group.
 #'
 #' @section The argument \code{type}:
@@ -367,7 +479,7 @@ warn_up = function(..., up = 1, immediate. = FALSE){
 #' message("You should: ", enumerate_items(todo, "enum.or"), "?")
 #'
 #'
-enumerate_items = function (x, type, verb = FALSE, s = FALSE, past = FALSE, or = FALSE, start_verb = FALSE, quote = FALSE, enum = FALSE, nmax = 7){
+enumerate_items = function (x, type, verb = FALSE, s = FALSE, past = FALSE, or = FALSE, start_verb = FALSE, quote = FALSE, enum = FALSE, other = "", nmax = 7){
   # function that enumerates items and add verbs
   # in argument type, you can have a mix of the different arguments, all separated with a "."
 
@@ -398,6 +510,14 @@ enumerate_items = function (x, type, verb = FALSE, s = FALSE, past = FALSE, or =
       args = args[!grepl("^enum", args)]
     }
 
+    is_other = any(grepl("^other\\(", args))
+    if(is_other){
+      arg_other = args[grepl("^other\\(", args)][1]
+      other = gsub("^.+\\(|\\).*", "", arg_other)
+
+      args = args[!grepl("^other", args)]
+    }
+
     # Now the verb
     verb = setdiff(args, c("s", "past", "or", "start", "quote"))
     if(length(verb) == 0){
@@ -417,8 +537,23 @@ enumerate_items = function (x, type, verb = FALSE, s = FALSE, past = FALSE, or =
 
   # Ensuring it's not too long
   if(n > nmax){
-    x = c(x[1:5], paste0(n - 5, " others"))
+
+    other = trimws(other)
+    if(nchar(other) > 0){
+      other = paste0(other, " ", n - 5, " others")
+    } else {
+      other = paste0(n - 5, " others")
+    }
+
+    if(quote){
+      x = c(paste0("'", x[1:5], "'"), other)
+    } else {
+      x = c(x[1:5], other)
+    }
+
     n = length(x)
+  } else if(quote){
+    x = paste0("'", x, "'")
   }
 
   # The verb
@@ -458,10 +593,6 @@ enumerate_items = function (x, type, verb = FALSE, s = FALSE, past = FALSE, or =
     startWord = ifelse(n == 1, " ", "s ")
   } else {
     startWord = ""
-  }
-
-  if(quote){
-    x = paste0("'", x, "'")
   }
 
   if(enum != "FALSE"){
@@ -713,6 +844,8 @@ plural_core = function(PLURAL, type, s, verb = FALSE, past = FALSE){
 #'
 n_times = function(n){
 
+  if(length(n) == 0) return("")
+
   dict = c("once", "twice", "three times", "four times")
 
   res = as.character(n)
@@ -720,7 +853,7 @@ n_times = function(n){
   qui = n <= 4
   res[qui] = dict[n[qui]]
 
-  if(any(!qui)){
+  if(any(!is.na(qui) & !qui)){
     res[!qui] = paste0(n[!qui], " times")
   }
 
@@ -730,6 +863,8 @@ n_times = function(n){
 #' @describeIn n_times Transforms the integer \code{n} to \code{nth} appropiately.
 n_th = function(n){
 
+  if(length(n) == 0) return("")
+
   dict = c("first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "nineth", "tenth", "eleventh", "twelfth", "thirteenth")
 
   res = as.character(n)
@@ -737,7 +872,7 @@ n_th = function(n){
   qui = n <= 13
   res[qui] = dict[n[qui]]
 
-  if(any(!qui)){
+  if(any(!is.na(qui) & !qui)){
     other = n[!qui]
     rest = other %% 10
     rest[rest == 0 | rest >= 4] = 4
@@ -752,11 +887,13 @@ n_th = function(n){
 #' @describeIn n_times Transforms small integers to words.
 n_letter = function(n){
 
+  if(length(n) == 0) return("")
+
   dict = strsplit("one.two.three.four.five.six.seven.eight.nine.ten.eleven.twelve.thirtheen.fourteen.fifteen.sixteen.seventeen.eighteen.nineteen", "\\.")[[1]]
 
   res = as.character(n)
 
-  qui = n <= length(dict)
+  qui = n <= length(dict) & n > 0
   res[qui] = dict[n[qui]]
 
   res
@@ -864,7 +1001,7 @@ fit_screen = function(msg){
 
   # Note that \t are NOT handled
 
-  MAX_WIDTH = getOption("width")
+  MAX_WIDTH = getOption("width") * 0.9
 
   res = c()
 
@@ -892,6 +1029,252 @@ fit_screen = function(msg){
 
   paste(res, collapse = "\n")
 }
+
+
+#' Fills a string vector with a symbol
+#'
+#' Fills a string vector with a user-provided symbol, up to the required length.
+#'
+#' @param x A character vector.
+#' @param n A positive integer giving the total expected length of each character string. Can be NULL (default). If \code{NULL}, then \code{n} is set to the maximum number of characters in \code{x} (i.e. \code{max(nchar(x))}).
+#' @param symbol Character scalar, default to \code{" "}. The symbol used to fill.
+#' @param right Logical, default is \code{FALSE}. Whether the character vector should be filled on the left( default) or on the right.
+#' @param anchor Character scalar, can be missing. If provided, the filling is done up to this anchor. See examples.
+#'
+#' @return
+#' Returns a character vector of the same length as \code{x}.
+#'
+#' @examples
+#'
+#' # Some self-explaining examples
+#' x = c("hello", "I", "am", "No-one")
+#' cat(sep = "\n", sfill(x))
+#' cat(sep = "\n", sfill(x, symbol = "."))
+#' cat(sep = "\n", sfill(x, symbol = ".", n = 15))
+#' cat(sep = "\n", sfill(x, symbol = ".", right = TRUE))
+#'
+#' cat(sep = "\n", paste(sfill(x, symbol = ".", right = TRUE), ":", 1:4))
+#'
+#' # Argument 'anchor' can be useful when using numeric vectors
+#' x = c(-15.5, 1253, 32.52, 665.542)
+#' cat(sep = "\n", sfill(x))
+#' cat(sep = "\n", sfill(x, anchor = "."))
+#'
+sfill = function(x = "", n = NULL, symbol = " ", right = FALSE, anchor){
+  # Character vectors starting with " " are not well taken care of
+
+  check_arg_plus(x, "character vector conv")
+  check_arg(n, "NULL integer scalar GE{0}")
+  check_arg(symbol, "character scalar")
+  check_arg(right, "logical scalar")
+  check_arg(anchor, "character scalar")
+
+  if(nchar(symbol) != 1) stop("Argument 'symbol' must be a single character (currenlty it is of length ", nchar(symbol), ").")
+
+  IS_ANCHOR = FALSE
+  if(!missing(anchor)){
+    if(nchar(anchor) != 1){
+      stop("If provided, argument 'anchor' must be a single character (currenlty it is of length ", nchar(symbol), ").")
+    }
+    IS_ANCHOR = TRUE
+    x_origin = x
+    is_x_anchor = grepl(anchor, x, fixed = TRUE)
+    x_split = strsplit(x, anchor, fixed = TRUE)
+    x = sapply(x_split, function(v) v[1])
+  }
+
+  if(!is.null(n) && n == 0) return(x)
+
+  n_all = nchar(x)
+  if(is.null(n)) n = max(n_all)
+
+  n2fill = n - n_all
+  qui = which(n2fill > 0)
+  if(length(qui) == 0) return(x)
+
+  if(symbol == " "){
+    if(right == TRUE){
+      x_new = sprintf("%-*s", n, x[qui])
+    } else {
+      x_new = sprintf("%*s", n, x[qui])
+    }
+  } else {
+    pattern = rep(symbol, n)
+    value2append = sapply(n2fill[qui], function(nmax) paste(pattern[1:nmax], collapse = ""))
+    if(right == TRUE){
+      x_new = paste0(x[qui], value2append)
+    } else {
+      x_new = paste0(value2append, x[qui])
+    }
+  }
+
+  res = x
+  res[qui] = x_new
+
+  if(IS_ANCHOR){
+    for(i in seq_along(x_split)){
+      if(is_x_anchor[i]){
+        x_split[[i]][1] = res[i]
+        res[i] = paste(x_split[[i]], collapse = anchor)
+      }
+    }
+  }
+
+  res
+}
+
+
+
+
+
+#' Provides package statistics
+#'
+#' Summary statistics of a packages: number of lines, number of functions, etc...
+#'
+#' @details
+#' This function looks for files in the \code{R/} and \code{src/} folders and gives some stats. If there is no \code{R/} folder directly accessible from the working directory, there will be no stats displayed.
+#'
+#' Why this function? Well, it's just some goodies for package developers trying to be user-friendly!
+#'
+#' The number of documentation lines (and number of words) corresponds to the number of non-empty roxygen documentation lines. So if you don't document your code with roxygen, well, this stat won't prompt.
+#'
+#' Code lines correspond to non-commented, non-empty lines (by non empty: at least one letter must appear).
+#'
+#' Comment lines are non-empty comments.
+#'
+#' @return
+#' Doesn't return anything, just a prompt in the console.
+#'
+#' @examples
+#'
+#' package_stats()
+#'
+package_stats = function(){
+  r_files = list.files("./R", full.names = TRUE)
+  r_files = r_files[!grepl("Rcpp", r_files)]
+
+  n_r = length(r_files)
+
+  if(n_r == 0){
+    message("Your project doesn't look like a package... Sorry, no stats!")
+    return(invisible(NULL))
+  }
+
+  my_file = c()
+  for(i in 1:n_r){
+    my_file = c(my_file, readLines(r_files[i]))
+  }
+
+  head_3 = function(x) if(length(x) <= 3) return(x) else return(x[1:3])
+
+  # some stats
+  n_r_lines = length(my_file)
+
+  qui_code = !grepl("^( |\t)*#", my_file) & grepl("[[:alnum:]]", my_file)
+  all_code = my_file[qui_code]
+  all_assign = all_code[grepl("^( |\t)*[[:alpha:]][[:alnum:]\\._]* *(=|<-)", all_code)]
+
+  vars = gsub("^( |\t)*| *(=|<-).*", "", all_assign)
+  tvars = head_3(sort(table(vars), decreasing = TRUE))
+  fav_var = paste0(names(tvars), " [", tvars, "]")
+
+  n_r_code = sum(qui_code)
+  n_r_comment = sum(grepl("^( |\t)*#[^']", my_file))
+
+  qui_doc = grepl("^#'", my_file)
+  all_doc = my_file[qui_doc & grepl("[[:alpha:]]", my_file)]
+  n_doc_words = sum(lengths(strsplit(all_doc, "( |\\(|\\{)[[:alpha:]]")) - 1)
+  n_r_doc = sum(qui_doc)
+  n_r_funs = sum(grepl("^[\\.[:alnum:]][\\.[:alnum:]_]* *(=|<-) *function", my_file))
+
+
+  c_files = list.files("./src", full.names = TRUE)
+  c_files = c_files[!grepl("Rcpp", c_files) & grepl("\\.c(pp)?$", c_files)]
+
+  n_c = length(c_files)
+  if(n_c > 0){
+    my_c_file = c()
+    for(i in 1:n_c){
+      my_c_file = c(my_c_file, readLines(c_files[i]))
+    }
+
+    n_c_lines = length(my_c_file)
+    n_c_code = sum(!grepl("^( |\t)*//", my_c_file) & grepl("[[:alnum:]]", my_c_file))
+    n_c_comment = sum(grepl("^( |\t)*//", my_c_file))
+    n_c_funs = sum(grepl("^[\\.[:alnum:]_]* [\\.[:alnum:]_]*\\(", my_c_file))
+    n_c_fun_c_export = sum(grepl("^// \\[\\[Rcpp", my_c_file))
+  }
+
+  line_doc = ifelse(n_doc_words > 0, paste0("\n........doc: ", signif_plus(n_r_doc), " (", signif_plus(n_doc_words), " words)"), "")
+
+  cat("-----------------------
+|| Package Statistics ||
+------------------------
+
+R code:",
+      "\n# Lines: ", signif_plus(n_r_lines),
+      "\n.......code: ", signif_plus(n_r_code), " (fav. vars: ", enumerate_items(fav_var), ")",
+      "\n...comments: ", signif_plus(n_r_comment),
+      line_doc,
+      "\n# Functions: ", signif_plus(n_r_funs), sep = "")
+
+
+  if(n_c > 0){
+    # Rcpp specific
+    line_export = ifelse(n_c_fun_c_export > 0, paste0("\n# Functions (Rcpp exports): ", signif_plus(n_c_fun_c_export)), "")
+    intro = "C++ code:"
+    if(!any(grepl("\\.cpp$", c_files))){
+      intro = "C code:"
+    } else if(any(grepl("\\.c$", c_files))){
+      intro = "C/C++ code:"
+    }
+    cat("\n\n", intro,
+        "\n# Lines: ", signif_plus(n_c_lines),
+        "\n.......code: ", signif_plus(n_c_code),
+        "\n...comments: ", signif_plus(n_c_comment),
+        "\n# Functions: ", signif_plus(n_c_funs),
+        line_export, sep = "")
+
+    cat("\n\nTOTAL:",
+        "\n# Lines: ", signif_plus(sum(n_c_lines) + sum(n_r_lines)),
+        "\n# Code: ", signif_plus(sum(n_c_code) + sum(n_r_code)),
+        "\n# Functions: ", signif_plus(sum(n_c_funs) + sum(n_r_funs)), sep = "")
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

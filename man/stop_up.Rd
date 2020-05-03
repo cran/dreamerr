@@ -12,7 +12,7 @@ warn_up(..., up = 1, immediate. = FALSE)
 \arguments{
 \item{...}{Objects that will be coerced to character and will compose the error message.}
 
-\item{up}{The number of frames up, default is 1. The call in the error message will be based on the function \code{up} frames up the stack. See examples.}
+\item{up}{The number of frames up, default is 1. The call in the error message will be based on the function \code{up} frames up the stack. See examples. If you have many calls to \code{stop_up}/\code{warn_up} with a value of \code{up} different than one, you can use \code{\link[dreamerr]{set_up}} to change the default value of \code{up} within the function.}
 
 \item{immediate.}{Whether the warning message should be prompted directly. Defaults to \code{FALSE}.}
 }

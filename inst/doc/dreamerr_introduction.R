@@ -1,7 +1,7 @@
-## ----setup, include=FALSE------------------------------------------------
+## ----setup, include=FALSE-----------------------------------------------------
 knitr::opts_chunk$set(echo = TRUE, eval = TRUE)
 
-## ---- echo = FALSE-------------------------------------------------------
+## ---- echo = FALSE------------------------------------------------------------
 library(dreamerr)
 x = 1:5
 y = pt
@@ -14,19 +14,19 @@ sum_check = function(...){
 Sys.setenv(LANG = "en")
 
 
-## ---- error = TRUE-------------------------------------------------------
+## ---- error = TRUE------------------------------------------------------------
 sum(x, y)
 
-## ---- error = TRUE-------------------------------------------------------
+## ---- error = TRUE------------------------------------------------------------
 sum_check(x, y)
 
-## ---- eval = FALSE-------------------------------------------------------
+## ---- eval = FALSE------------------------------------------------------------
 #  sum_check = function(...){
 #    check_arg(..., "numeric vector")
 #    sum(...)
 #  }
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 plot_cor = function(x, y = NULL, line.opts = list(), ...){
   # x: numeric vector, must be given by the user
   check_arg(x, "numeric vector mbt")
@@ -35,7 +35,7 @@ plot_cor = function(x, y = NULL, line.opts = list(), ...){
   # - if y is NULL, then x with some noise is assigned to it 
   check_arg_plus(y, "NULL{x + rnorm(length(x))} numeric vector len(data)", .data = x)
   
-  # We ensure the arguments are lists (even of 0-length)
+  # We ensure line.opts is a list (even of 0-length)
   check_arg(line.opts, "named list L0")
   
   # The linear regression + options from ...
@@ -51,7 +51,7 @@ plot_cor = function(x, y = NULL, line.opts = list(), ...){
   # - otherwise, a positive integer or a character scalar
   check_arg_plus(line.opts$col, "NULL{'firebrick'} match(firebrick, darkblue) | scalar(integer, character) GE{0}") 
   # lwd:
-  # - if not provide => 2
+  # - if not provided => 2
   # - otherwise a positive integer scalar
   check_arg_plus(line.opts$lwd, "integer scalar GE{0} NULL{2}") # check + default
   
@@ -62,7 +62,7 @@ plot_cor = function(x, y = NULL, line.opts = list(), ...){
 plot_cor(rnorm(100), line.opts = list(col = "dark"))
 
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 lm_check = function(formula, data, subset, weights, na.action, method = "qr", model = TRUE, x = FALSE, y = FALSE, qr = TRUE, singular.ok = TRUE, contrasts = NULL, offset, ...){
 
   # data:
@@ -113,7 +113,7 @@ lm_check = function(formula, data, subset, weights, na.action, method = "qr", mo
   eval(mc, parent.frame())
 }
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 lm_check_bis = function(formula, data, subset, weights, na.action, method = "qr", model = TRUE, x = FALSE, y = FALSE, qr = TRUE, singular.ok = TRUE, contrasts = NULL, offset, ...){
 
   # data: now only a data.frame and required
