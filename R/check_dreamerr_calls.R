@@ -10,6 +10,11 @@ check_dreamerr_calls = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x
   # This internal function tries to fully check the call to check_arg
   # in particular errors/warnings will pop when the types are ill-formed
 
+  # If the call to check_arg is within a function contained in a package that uses dreamerr => we skip checking
+  current_fun = deparse(sys.call(sys.parent(.up + 2))[[1]])
+  where_fun = find(current_fun, mode = "function")
+  if(any(grepl("package", where_fun, fixed = TRUE))) return(NULL)
+
   #
   # The calls
   #
@@ -116,10 +121,11 @@ check_dreamerr_calls = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x
     # Error if dots arguments provided
     #
 
-    if("..." %in% names(mc) && !is.null(names(mc[["..."]]))){
-      arg_pblm = names(mc[["..."]])
-      stop_up("Argument", enumerate_items(arg_pblm, "s.is"), " not valid. If it was an argument to be checked, please use only .x, .x1 to .x9 and .type.")
-    }
+    # Does not work well => sends an error when there's none
+    # if("..." %in% names(mc) && !is.null(names(mc[["..."]]))){
+    #   arg_pblm = names(mc[["..."]])
+    #   stop_up("Argument", enumerate_items(arg_pblm, "s.is"), " not valid. If it was an argument to be checked, please use only .x, .x1 to .x9 and .type.")
+    # }
 
     #
     # Finding the type
@@ -447,7 +453,12 @@ check_dreamerr_calls = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x
 
             } else if(is_there("logical")){
               my_type = clean_kw("logical")
-              my_type = clean_kw("strict")
+              if(is_there("strict")){
+                # We apply this warning only to current users! We don't trigger it when a sub-function uses dreamerr
+                warn_up(up = 2, "The type 'strict logical' has been deprecated. Now by default, 'logical' is strict, but you have the new keyword 'loose' to get the old behavior back.")
+                my_type = clean_kw("strict")
+              }
+              my_type = clean_kw("loose")
 
             } else if(is_there("character")){
               my_type = clean_kw("character")
@@ -518,7 +529,7 @@ check_dreamerr_calls = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x
       make_error_warning("scalar.equality.na ?ok.type", my_type_raw)
 
     } else if(is_there("vector")){
-      make_error_warning("vector.len.equality.na ?ok.type.named", my_type_raw)
+      make_error_warning("vector.len.equality.no ?na.type.named", my_type_raw)
 
     } else if(is_there("list")){
       make_error_warning("list.named.len", my_type_raw)
@@ -528,7 +539,7 @@ check_dreamerr_calls = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x
       make_error_warning("data.frame.no ?na.dim", my_type_raw)
 
     } else if(is_there("matrix")){
-      make_error_warning("matrix.type.square.dim.equality.na ?ok", my_type_raw)
+      make_error_warning("matrix.type.square.dim.equality.no ?na", my_type_raw)
 
     } else if(is_there("formula")){
       make_error_warning("formula.sided.var.right.left", my_type_raw)

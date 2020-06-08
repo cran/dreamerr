@@ -78,7 +78,7 @@ lm_check = function(formula, data, subset, weights, na.action, method = "qr", mo
   # subset:
   # - either a logical or an integer vector
   # - can be a variable of the data set (eval)
-  check_arg(subset, "eval vector(strict logical, strict integer)", .data = data)
+  check_arg(subset, "eval vector(logical, strict integer)", .data = data)
   
   # weights:
   # - vector of positive integers

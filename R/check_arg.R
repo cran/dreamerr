@@ -13,6 +13,11 @@ send_error = function(all_reasons, x_name, type, message, choices = NULL, up, .v
 
   all_types = strsplit(type, "|", fixed = TRUE)[[1]]
 
+  # msg_start will be set up later
+  msg_start = NULL
+
+  IS_VALUE = get("IS_VALUE", parent.frame())
+
   if(grepl("(?i)match|charin", type)){
     sysOrigin = sys.parent(up + 3)
     choices = extract_choices(x_name, type, choices, sysOrigin)
@@ -26,12 +31,21 @@ send_error = function(all_reasons, x_name, type, message, choices = NULL, up, .v
     text_problem = " Problem: "
   }
 
-  if(!missing(message) && grepl("__arg_name__", message, fixed = TRUE)){
-    x_name = extract_par(message, "__arg_name__")
-    message = NULL
+  # start_with_value: specific to check_value // whether x refers to an argument or just a value
+  start_with_value = TRUE
+  if(!missing(message)){
+    if(grepl("__arg_name__", message, fixed = TRUE)){
+      x_name = extract_par(message, "__arg_name__")
+      message = NULL
+      start_with_value = FALSE
+    } else if(grepl("__prefix__", message, fixed = TRUE)){
+      msg_start = paste0(gsub(" *$", " ", extract_par(message, "__prefix__")), "must be ")
+      x_name = ""
+      message = NULL
+    }
   }
 
-  if(!missing(message) && grepl("__ARG__", message, fixed = TRUE)){
+  if(!missing(message) && !is.null(message) && grepl("__ARG__", message, fixed = TRUE)){
     message = gsub("__ARG__", x_name, message)
   }
 
@@ -414,16 +428,16 @@ send_error = function(all_reasons, x_name, type, message, choices = NULL, up, .v
 
       # greater
       if(grepl("ge{", my_type, fixed = TRUE)){
-        value_ge = extract_curly(my_type_raw, "ge", as.string = TRUE)
+        value_ge = signif_plus(extract_curly(my_type_raw, "ge"), 5)
       } else if(grepl("gt{", my_type, fixed = TRUE)){
-        value_gt = extract_curly(my_type_raw, "gt", as.string = TRUE)
+        value_gt = signif_plus(extract_curly(my_type_raw, "gt"), 5)
       }
 
       # lower
       if(grepl("le{", my_type, fixed = TRUE)){
-        value_le = extract_curly(my_type_raw, "le", as.string = TRUE)
+        value_le = signif_plus(extract_curly(my_type_raw, "le"), 5)
       } else if(grepl("lt{", my_type, fixed = TRUE)){
-        value_lt = extract_curly(my_type_raw, "lt", as.string = TRUE)
+        value_lt = signif_plus(extract_curly(my_type_raw, "lt"), 5)
       }
 
       if(!is.null(value_ge) || !is.null(value_gt) || !is.null(value_le) || !is.null(value_lt)){
@@ -517,28 +531,32 @@ send_error = function(all_reasons, x_name, type, message, choices = NULL, up, .v
 
   if(missing(message) || is.null(message)){
 
-    add_null = ifelse(grepl("(?i)null", type), "(nullable) ", "")
-    if(IS_DOTS){
-      msg_start = paste0(" In argument '...', each ", add_null, "element must be ")
-    } else if(grepl("$", x_name, fixed = TRUE)){
-      # This means it is a list element
-      l_name = gsub("\\$.+", "", x_name)
-      element = gsub(".+\\$", "", x_name)
+    if(is.null(msg_start)){
+      add_null = ifelse(grepl("(?i)null", type), "(nullable) ", "")
+      if(IS_DOTS){
+        msg_start = paste0(" In argument '...', each ", add_null, "element must be ")
+      } else if(grepl("$", x_name, fixed = TRUE)){
+        # This means it is a list element
+        l_name = gsub("\\$.+", "", x_name)
+        element = gsub(".+\\$", "", x_name)
 
-      IS_VALUE = get("IS_VALUE", parent.frame())
+        if(IS_VALUE && l_name == "dots"){
+          msg_start = paste0("In '...', if provided, the argument '", element, "' must be ")
+        } else {
+          msg_start = paste0("In the list argument '", l_name, "', the ", add_null, "element '", element, "' must be ")
+        }
 
-      if(IS_VALUE && l_name == "dots"){
-        msg_start = paste0("In '...', if provided, the argument '", element, "' must be ")
+        x_name = ""
       } else {
-        msg_start = paste0("In the list argument '", l_name, "', the ", add_null, "element '", element, "' must be ")
+        if(IS_VALUE && start_with_value){
+          the_null_argument = ifelse(nchar(add_null) > 0, " The (nullable) value", " Value")
+        } else {
+          the_null_argument = ifelse(nchar(add_null) > 0, " The (nullable) argument", " Argument")
+        }
+
+        msg_start = paste0(the_null_argument, " '", x_name, "' must be ")
       }
-
-      x_name = ""
-    } else {
-      the_null_argument = ifelse(nchar(add_null) > 0, " The (nullable) argument", " Argument")
-      msg_start = paste0(the_null_argument, " '", x_name, "' must be ")
     }
-
 
     # dropping the invalid types
     all_types = all_types[all_requested_types != "invalid"]
@@ -600,7 +618,8 @@ send_error = function(all_reasons, x_name, type, message, choices = NULL, up, .v
   #
 
   # The original call
-  my_call = deparse(sys.calls()[[sys.nframe()-(up + 3)]])[1] # call can have svl lines
+  my_frame = ifelse(sys.nframe() <= up + 3, 1, sys.nframe()-(up + 3))
+  my_call = deparse(sys.calls()[[my_frame]])[1] # call can have svl lines
   nmax = 40
   if(nchar(my_call) > nmax) my_call = paste0(substr(my_call, 1, nmax-1), "...")
 
@@ -704,13 +723,14 @@ extract_type = function(x){
     return("factor")
 
   } else if(grepl("logical", x, fixed = TRUE)){
-    if(grepl("loose", x, fixed = TRUE)){
-      return("logical")
-    } else if(!grepl("strict", x, fixed = TRUE)){
-      return("logical")
-    } else {
-      return("strict_logical")
-    }
+    return("logical")
+    # if(grepl("loose", x, fixed = TRUE)){
+    #   return("logical")
+    # } else if(!grepl("strict", x, fixed = TRUE)){
+    #   return("logical")
+    # } else {
+    #   return("strict_logical")
+    # }
   }
   return(NULL)
 }
@@ -1153,7 +1173,7 @@ deparse_short = function(x){
 #'
 #' @param .x An argument to be checked. Must be an argument name. Can also be the type, see details/examples.
 #' @param .type A character string representing the requested type(s) of the arguments. This is a bit long so please look at the details section or the vignette for explanations. Each type is composed of one main class and restrictions (optional). Types can be separated with pipes (\code{|}). The main classes are: i) \code{"scalar"} for scalars, i.e. vectors of length one, ii) \code{"vector"}, iii) \code{"matrix"}, iv) \code{"data.frame"}, v) \code{"list"}, vi) \code{formula}, vii) \code{function}, viii) \code{charin}, i.e. a character string in a set of choices, viii) \code{"match"}, i.e. a character scalar that should partially match a vector of choices, x) \code{"class(my_class1, my_class2)"}, i.e. an object whose class is any of the ones in parentheses, xi) \code{"NA"}, something identical to \code{NA}.
-#' You can then add optional restrictions: 1) \code{len(a, b)}, i.e. the object should be of length between \code{a} and \code{b} (you can leave \code{a} or \code{b} missing, \code{len(a)} means length *equal* to \code{a}), \code{len(data)} and \code{len(value)} are also possible (see details), 2) \code{nrow(a,b)} or \code{ncol(a,b)} to specify the expected number of rows or columns, 3) \code{arg(a,b)}, only for functions, to retrict the number of arguments, 4) \code{"na ok"} to allow the object to have NAs (for "scalar", "vector", "matrix" types), or \code{"no na"} to restrict the object to have no NA (for "data.frame" only), 5) \code{GE}, \code{GT}, \code{LE} and \code{LT}: for numeric scalars/vectors/matrices, \code{GE{expr}} restrics the object to have only values striclty greater than (greater or equal/strictly lower than/lower or equal) the value in curly brackets, 6) e.g. \code{scalar(type1, type2)}, for scalars/vectors/matrices you can restrict the type of the object by adding the expected type in parentheses: should it be numeric, logical, etc.
+#' You can then add optional restrictions: 1) \code{len(a, b)}, i.e. the object should be of length between \code{a} and \code{b} (you can leave \code{a} or \code{b} missing, \code{len(a)} means length *equal* to \code{a}), \code{len(data)} and \code{len(value)} are also possible (see details), 2) \code{nrow(a,b)} or \code{ncol(a,b)} to specify the expected number of rows or columns, 3) \code{arg(a,b)}, only for functions, to retrict the number of arguments, 4) \code{"na ok"} to allow the object to have NAs (for "scalar" types), or \code{"no na"} to restrict the object to have no NA (for "data.frame", "vector", and "matrix" types), 5) \code{GE}, \code{GT}, \code{LE} and \code{LT}: for numeric scalars/vectors/matrices, \code{GE{expr}} restrics the object to have only values striclty greater than (greater or equal/strictly lower than/lower or equal) the value in curly brackets, 6) e.g. \code{scalar(type1, type2)}, for scalars/vectors/matrices you can restrict the type of the object by adding the expected type in parentheses: should it be numeric, logical, etc.
 #' @param .x1 An argument to be checked. Must be an argument name. Can also be the type, see details/examples.
 #' @param .x2 An argument to be checked. Must be an argument name. Can also be the type, see details/examples.
 #' @param .x3 An argument to be checked. Must be an argument name. Can also be the type, see details/examples.
@@ -1168,7 +1188,8 @@ deparse_short = function(x){
 #' @param .choices Only if one of the types (in argument \code{type}) is \code{"match"}. The values the argument can take. Note that even if the \code{type} is \code{"match"}, this argument is optional since you have other ways to declare the choices.
 #' @param .data Must be a data.frame, a list or a vector. Used in three situations. 1) if the global keywords \code{eval} or \code{evalset} are present: the argument will also be evaluated in the data (i.e. the argument can be a variable name of the data set). 2) if the argument is expected to be a formula and \code{var(data)} is included in the type: then the formula will be expected to contain variables from \code{.data}. 3) if the keywords \code{len(data)}, \code{nrow(data)} or \code{ncol(data)} are requested, then the required length, number of rows/columns, will be based on the data provided in \code{.data}.
 #' @param .value An integer scalar or a named list of integers scalars. Used when the keyword \code{value} is present (like for instance in \code{len(value)}). If several values are to be provided, then it must be a named list with names equal to the codes: for instance if \code{nrow(value)} and \code{ncol(value)} are both present in the type, you can use (numbers are an example) \code{.value = list(nrow = 5, ncol = 6)}. See Section IV) in the examples.
-#' @param .arg_name A character scalar. If \code{.message} is not provided, an automatic error message will be generated using \code{.arg_name} as the argument name.
+#' @param .arg_name A character scalar. If \code{.message} is not provided, an automatic error message will be generated using \code{.arg_name} as the argument name. The structure of the message will be \code{"Argument '[.arg_name]' must be [requested type]. Problem: [detail of the problem]"}.
+#' @param .prefix A character scalar. If \code{.message} is not provided, an automatic error message will be generated. The structure of the message will be \code{"[.prefix] must be [requested type]. Problem: [detail of the problem]"}.
 #' @param .env An environment defaults to the frame where the user called the original function. Only used in two situations. 1) if the global keywords \code{eval} or \code{evalset} are present: the argument will also be evaluated in this environment. 2) if the argument is expected to be a formula and \code{var(env)} is included in the type: then the formula will be expected to contain variables existing in \code{.env}.
 #' @param .up Integer, default is 0. If the user provides a wrong argument, the error message will integrate the call of the function from which \code{check_arg} has been called. If \code{check_arg} is  called in a non-user level sub function of a main user-level function, then use \code{.up = 1} to make the error message look like it occured in the main function (and not in the sub function). Of course you can have values higher than 1.
 #'
@@ -1178,7 +1199,7 @@ deparse_short = function(x){
 #'
 #' The syntax is: \code{"main_class option(s) restriction(s)"}
 #'
-#' A type MUST have at least one main class. For example: in the type \code{"logical vector len(,2) NA OK"}, \code{vector} is the main class, \code{NA OK} is the option, and \code{logical} and \code{len(,2)} are restrictions
+#' A type MUST have at least one main class. For example: in the type \code{"logical vector len(,2) no na"}, \code{vector} is the main class, \code{no na} is the option, and \code{logical} and \code{len(,2)} are restrictions
 #'
 #' There are 13 main classes that can be checked. On the left the keyword, on the right what is expected from the argument, and in square brackets the related section in the examples:
 #' \itemize{
@@ -1199,8 +1220,8 @@ deparse_short = function(x){
 #'
 #' There are seven type options, they are not available for each types. Here what they do and the types to which they are associated:
 #' \itemize{
-#' \item \code{NA OK} (or \code{NAOK}): Tolerates the presence of NA values. Available for \code{scalar}, \code{vector}, \code{matrix}, \code{vmatrix}.
-#' \item \code{NO NA} (or \code{NONA}): Throws an error if NAs are present. Available for \code{data.frame}, \code{vdata.frame}.
+#' \item \code{NA OK} (or \code{NAOK}): Tolerates the presence of NA values. Available for \code{scalar}.
+#' \item \code{NO NA} (or \code{NONA}): Throws an error if NAs are present. Available for \code{vector}, \code{matrix}, \code{vmatrix}, \code{data.frame}, and \code{vdata.frame}.
 #' \item \code{square}: Enforces the matrix to be square. Available for \code{matrix}, \code{vmatrix}.
 #' \item \code{named}: Enforces the object to have names. Available for \code{vector}, \code{list}.
 #' \item \code{multi}: Allows multiple matches. Available for \code{charin}, \code{match}.
@@ -1210,7 +1231,7 @@ deparse_short = function(x){
 #'
 #' You can further add restrictions. There are roughly six types of restrictions. Here what they do and the types to which they are associated:
 #' \itemize{
-#' \item sub-type restriction: For atomic types (\code{scalar}, \code{vector}, \code{matrix} or \code{vmatrix}), you can restrict the underlying data to be of a specific sub-type. The simple sub-types are: i) \code{integer} (numeric without decimals and logicals), i') \code{strict integer} (numeric that can be converted to integer with \code{as.integer}, and not logicals), ii) \code{numeric}, iii) \code{factor}, iv) \code{logical} (a logical or a numeric equal to 0 or 1) and iv') \code{strict logical} (a logical only). Simply add the sub-type in the type string (e.g. \code{"integer scalar"}), or if you allow multiple types, put them in parentheses rigth after the main class: e.g. \code{"scalar(character, integer)"}. See Section XI) in the examples. See also the section below for more information on the sub-types. Some types (\code{character}, \code{integer}, \code{numeric}, \code{logical} and \code{factor}) also support the keyword \code{"conv"} in \code{check_arg_plus}.
+#' \item sub-type restriction: For atomic types (\code{scalar}, \code{vector}, \code{matrix} or \code{vmatrix}), you can restrict the underlying data to be of a specific sub-type. The simple sub-types are: i) \code{integer} (numeric without decimals and logicals), i') \code{strict integer} (numeric that can be converted to integer with \code{as.integer}, and not logicals), ii) \code{numeric}, iii) \code{factor}, iv) \code{logical} and iv') \code{loose logical} (0/1 are also OK). Simply add the sub-type in the type string (e.g. \code{"integer scalar"}), or if you allow multiple types, put them in parentheses rigth after the main class: e.g. \code{"scalar(character, integer)"}. See Section XI) in the examples. See also the section below for more information on the sub-types. Some types (\code{character}, \code{integer}, \code{numeric}, \code{logical} and \code{factor}) also support the keyword \code{"conv"} in \code{check_arg_plus}.
 #' \item \code{GE}/\code{GT}/\code{LE}/\code{LT}: For atomic types with numeric data, you can check the values in the object. The GE/GT/LE/LT mean respectively greater or equal/greater than/lower or equal/lower than. The syntax is \code{GE{expr}}, with expr any expression. See Section IV) in the examples.
 #' \item \code{len(a, b)}: You can restrict the length of objects with \code{len(a, b)} (with \code{a} and \code{b} integers). Available for \code{vector} and \code{list}. Then the length must be in between \code{a} and \code{b}. Either \code{a} or \code{b} can be missing which means absence of restriction. If \code{len(a)}, this means must be equal to \code{a}. You can also use the keywords len(data) which ensures that the length is the same as the length of the object given in the argument \code{.data}, or \code{len(value)} which ensures the length is equal to the value given in \code{.value}. See Section IV) in the examples.
 #' \item \code{nrow(a, b)}, \code{ncol(a, b)}: To restrict the number of rows and columns. Available for \code{matrix}, \code{vmatrix}, \code{data.frame}, \code{vdata.frame}. Tolerates the \code{data} and \code{value} keywords (see in \code{len}). See Section IV) in the examples.
@@ -1279,7 +1300,7 @@ deparse_short = function(x){
 #'
 #' @section Checking multiple arguments:
 #'
-#' You can check multiple arguments at once provided they are of the same type. Say variables \code{x1} to \code{x5} should be single logicals. Just use: \code{check_arg(x1, x2, x3, x4, x5, "logical scalar")}. It is always more efficient to check multiple arguments of the same type \emph{at once}.
+#' You can check multiple arguments at once provided they are of the same type. Say variables \code{x1} to \code{x5} should be logical scalars. Just use: \code{check_arg(x1, x2, x3, x4, x5, "logical scalar")}. It is always more efficient to check multiple arguments of the same type \emph{at once}.
 #'
 #' It is important to note that in case of multiple arguments, you can place the type anywhere you want provided it is a character literal (and not in a variable!). This means that \code{check_arg("logical scalar", x1, x2, x3, x4, x5)} would also work.
 #'
@@ -1382,10 +1403,9 @@ deparse_short = function(x){
 #'   invisible(NULL)
 #' }
 #'
-#' # Following should be OK
+#' # Following is OK
 #' test_scalar()
 #' test_scalar(xlog = FALSE, xnum = 55, xint = 5, xnumlt = 0.11, xdate = Sys.Date())
-#' test_scalar(xlog = 1) # OK
 #'
 #' #
 #' # Now errors, all the following are wrong arguments, leading to errors
@@ -1395,7 +1415,6 @@ deparse_short = function(x){
 #' try(test_scalar(xlog = NA))
 #' try(test_scalar(xlog = 2))
 #' try(test_scalar(xlog = sum))
-#' try(test_scalar(xlog = pi))
 #' try(test_scalar(xlog = faefeaf5))
 #' try(test_scalar(xlog = c(TRUE, FALSE)))
 #' try(test_scalar(xlog = c()))
@@ -1441,10 +1460,10 @@ deparse_short = function(x){
 #' try(test_globals())
 #'
 #' # NULL{expr} sets the value of xnum to expr if xnum = NULL
-#' # Here NULL{1} sets it to 1
+#' # Here NULL{1} sets xnum to 1
 #' test_globals(xnum = NULL)
 #'
-#' # NULL (not NULL{expr}) does not reassign
+#' # NULL (not NULL{expr}) does not reassign: xlog remains NULL
 #' test_globals(xnum = NULL, xlog = NULL)
 #'
 #' # safe NULL: doesn't accept NULL from data.frame (DF) subselection
@@ -1605,8 +1624,8 @@ deparse_short = function(x){
 #' # The syntax is GE{expr}, with expr any expression
 #' # Of course, it only works for numeric values
 #' #
-#' # You can tolerate NA values (default is no tolerance in vector/matrices)
-#' # with the keyword 'NAOK' or 'NA OK'
+#' # By default NAs are tolerated in vector, matrix and data.frame.
+#' # You can refuse NAs using the keyword: 'no na' or 'nona'
 #' #
 #'
 #' test_vmat = function(xvec, xmat, xvmat, xstmat, xnamed){
@@ -1617,12 +1636,12 @@ deparse_short = function(x){
 #'   check_arg(xmat, "logicalMatrix NROW(2,) NCOL(3)")
 #'
 #'   # vector or matrix (vmatrix) of integers or character strings
-#'   # with at most 3 observations, NAs are OK
-#'   check_arg(xvmat, "vmatrix(character, integer) nrow(,3) naok")
+#'   # with at most 3 observations
+#'   # NAs are not allowed
+#'   check_arg(xvmat, "vmatrix(character, integer) nrow(,3) no na")
 #'
-#'   # square matrix of logicals, the values must be TRUE/FALSE,
-#'   # i.e. values equal to 0 or 1 are not OK
-#'   check_arg(xstmat, "strict Logical square Matrix")
+#'   # square matrix of integers, logicals reports errors
+#'   check_arg(xstmat, "strict integer square Matrix")
 #'
 #'   # A vector with names of length 2
 #'   check_arg(xnamed, "named Vector len(2)")
@@ -1630,25 +1649,24 @@ deparse_short = function(x){
 #' }
 #'
 #' # OK
-#' test_vmat(xvec = 5:20, xmat = matrix(TRUE, 3, 3), xvmat = c(NA, 4, 3),
-#'           xstmat = matrix(FALSE, 2, 2), xnamed = c(bon=1, jour=2))
+#' test_vmat(xvec = 5:20, xmat = matrix(TRUE, 3, 3), xvmat = c("abc", 4, 3),
+#'           xstmat = matrix(1:4, 2, 2), xnamed = c(bon=1, jour=2))
 #'
 #' # Vector checks:
-#' try(test_vmat(xvec = c(NA, 2:5)))
 #' try(test_vmat(xvec = 2))
 #' try(test_vmat(xvec = 21))
 #' try(test_vmat(xvec = 5.5))
 #'
 #' # Matrix checks:
-#' try(test_vmat(xmat = matrix(1, 3, 4)))
+#' try(test_vmat(xmat = matrix(TRUE, 3, 4)))
 #' try(test_vmat(xmat = matrix(2, 3, 3)))
-#' try(test_vmat(xmat = matrix(1, 1, 3)))
+#' try(test_vmat(xmat = matrix(FALSE, 1, 3)))
 #' try(test_vmat(xmat = iris))
 #'
 #' try(test_vmat(xvmat = iris))
+#' try(test_vmat(xvmat = c(NA, 5)))
 #'
 #' try(test_vmat(xstmat = matrix(1, 1, 3)))
-#' try(test_vmat(xstmat = matrix(1, 3, 3)))
 #' try(test_vmat(xstmat = matrix(c(TRUE, FALSE, NA), 3, 3)))
 #'
 #' # Named vector checks:
@@ -1880,8 +1898,8 @@ deparse_short = function(x){
 #' # - integer
 #' # - numeric
 #' # - factor
-#' # - logical (of type logical or a numeric equal to 0 or 1)
-#' # - strict logical (of type logical only)
+#' # - logical
+#' # - loose logical: either TRUE/FALSE, either 0/1
 #' #
 #' # If you require that the data is of one sub-type only:
 #' # - a) if it's one of the simple sub-types: add the keyword directly in the type
@@ -1897,7 +1915,7 @@ deparse_short = function(x){
 #' # Again, the parentheses MUST follow the main class directly.
 #' # Examples:
 #' # "vector(character, factor)"
-#' # "scalar(integer, strict logical)"
+#' # "scalar(integer, logical)"
 #' # "matrix(Date, integer, logical)"
 #' #
 #' # In check_arg_plus, you can use the keyword "conv" to convert to the
@@ -1905,7 +1923,7 @@ deparse_short = function(x){
 #' #
 #'
 #' test_multi_subtypes = function(x, y){
-#'   check_arg(x, "scalar(integer, strict logical)")
+#'   check_arg(x, "scalar(integer, logical)")
 #'   check_arg(y, "vector(character, factor, Date)")
 #'   invisible(NULL)
 #' }
@@ -1969,9 +1987,9 @@ deparse_short = function(x){
 #'
 #' # Let's throw some errors
 #' try(sum_fun(5))
-#' try(sum_fun(5, 1:5))
+#' try(diff_fun(5, 1:5))
 #'
-#' # The errors are at the level of sum_fun although
+#' # The errors are at the level of sum_fun/diff_fun although
 #' # the arguments have been checked in my_internal.
 #' # => much easier for the user to understand the problem
 #'
@@ -2203,14 +2221,14 @@ check_arg_plus = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
 }
 
 #' @describeIn check_arg Checks if a (single) value is of the appropriate type
-check_value = function(.x, .type, .message, .arg_name, .choices = NULL, .data = list(), .value, .env, .up = 0){
+check_value = function(.x, .type, .message, .arg_name, .prefix, .choices = NULL, .data = list(), .value, .env, .up = 0){
 
   if(!getOption("dreamerr_check") || exists("DREAMERR_CHECK", parent.frame(), inherits = FALSE)) return(NULL)
 
   mc = match.call(expand.dots = FALSE)
 
   if(getOption("dreamerr_dev.mode")){
-    check_dreamerr_calls(.x = .x, .type = .type, .message = .message, .arg_name = .arg_name, .choices = .choices, .data = .data, .value = .value, .env = .env, .up = .up)
+    check_dreamerr_calls(.x = .x, .type = .type, .message = .message, .arg_name = .arg_name, .prefix = .prefix, .choices = .choices, .data = .data, .value = .value, .env = .env, .up = .up)
   }
 
   # START::COPY(set_up)
@@ -2220,17 +2238,17 @@ check_value = function(.x, .type, .message, .arg_name, .choices = NULL, .data = 
   }
   # END::COPY(set_up)
 
-  check_arg_core(.x = .x, .type = .type, .message = .message, .arg_name = .arg_name, .choices = .choices, .data = .data, .value = .value, .env = .env, .up = .up, .mc = mc, .is_plus = FALSE, .is_value = TRUE)
+  check_arg_core(.x = .x, .type = .type, .message = .message, .arg_name = .arg_name, .prefix = .prefix, .choices = .choices, .data = .data, .value = .value, .env = .env, .up = .up, .mc = mc, .is_plus = FALSE, .is_value = TRUE)
 
 }
 
 #' @describeIn check_arg Same as \code{check_value}, but includes in addition: i) default setting, ii) type conversion, iii) partial matching, and iv) checking list elements. (Small drawback: cannot be turned off.)
-check_value_plus = function(.x, .type, .message, .arg_name, .choices = NULL, .data = list(), .value, .env, .up = 0){
+check_value_plus = function(.x, .type, .message, .arg_name, .prefix, .choices = NULL, .data = list(), .value, .env, .up = 0){
 
   mc = match.call(expand.dots = FALSE)
 
   if(getOption("dreamerr_dev.mode")){
-    check_dreamerr_calls(.x = .x, .type = .type, .message = .message, .arg_name = .arg_name, .choices = .choices, .data = .data, .value = .value, .env = .env, .up = .up)
+    check_dreamerr_calls(.x = .x, .type = .type, .message = .message, .arg_name = .arg_name, .prefix = .prefix, .choices = .choices, .data = .data, .value = .value, .env = .env, .up = .up)
   }
 
   # START::COPY(set_up)
@@ -2240,7 +2258,7 @@ check_value_plus = function(.x, .type, .message, .arg_name, .choices = NULL, .da
   }
   # END::COPY(set_up)
 
-  check_arg_core(.x = .x, .type = .type, .message = .message, .arg_name = .arg_name, .choices = .choices, .data = .data, .value = .value, .env = .env, .up = .up, .mc = mc, .is_plus = TRUE, .is_value = TRUE)
+  check_arg_core(.x = .x, .type = .type, .message = .message, .arg_name = .arg_name, .prefix = .prefix, .choices = .choices, .data = .data, .value = .value, .env = .env, .up = .up, .mc = mc, .is_plus = TRUE, .is_value = TRUE)
 
 }
 
@@ -2253,7 +2271,7 @@ check_value_plus = function(.x, .type, .message, .arg_name, .choices = NULL, .da
 #### CORE FUNCTION ####
 ####
 
-check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9, ..., .message, .choices = NULL, .data = list(), .value, .env, .up = 0, .arg_name, .mc, .is_plus = FALSE, .is_value = FALSE){
+check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9, ..., .message, .choices = NULL, .data = list(), .value, .env, .up = 0, .arg_name, .prefix, .mc, .is_plus = FALSE, .is_value = FALSE){
 
   # NOTA: the price to pay to using a core function called by user-level functions is about 4us. I think that's fair for the
   # clarity it adds to the code (and I hate duplication anyway).
@@ -2278,6 +2296,10 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
   # The copies are defined by # START :: COPY(chunk_name) // # END :: COPY(chunk_name)
   # Of course only the code in the main chunk is to be modified.
   #
+
+  # NOTE on the return of this function:
+  # when use return(x): means that the last exaluated x_all is returned. It's of use mostly for check_value_plus.
+  # x is guaranteed to exist.
 
   # Arg plus types:
   # - match
@@ -2374,9 +2396,6 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
       }
 
       type_low = tolower(type)
-      # if(IS_PLUS && !getOption("dreamerr_check") && !grepl("null{", type_low, fixed = TRUE) && !grepl("match", type_low, fixed = TRUE)) return(NULL)
-
-      # if(FLAG == "setup") return(NULL)
 
       #
       # Missing ####
@@ -2527,8 +2546,6 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
 
       if(all(is_done)) return(NULL)
 
-      # if(FLAG == "mbt") return(NULL)
-
     } else {
       #
       # dot-dot-dot ####
@@ -2661,7 +2678,8 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
 
         rm_adj = 0
 
-        x_all_tmp = list()
+        # x_all_tmp = list()
+        x_all_tmp = vector("list", length(args))
         for(i in seq_along(args)){
           x = switch(args[i], ".x" = error_catcher(.x), ".type" = error_catcher(.type), ".x1" = error_catcher(.x1), ".x2" = error_catcher(.x2), ".x3" = error_catcher(.x3), ".x4" = error_catcher(.x4), ".x5" = error_catcher(.x5), ".x6" = error_catcher(.x6), ".x7" = error_catcher(.x7), ".x8" = error_catcher(.x8), ".x9" = error_catcher(.x9))
 
@@ -2684,16 +2702,32 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
           if(RM_TYPE && identical(x, type)){
             rm_adj = 1
             RM_TYPE = FALSE
-          } else {
-            x_all_tmp[[length(x_all_tmp) + 1]] = x
+            x_all_tmp[[length(args)]] = NULL
+          # } else if(is.null(x)){
+          #   # stop_up("In argument '...', the ", n_th(naked_order[i - rm_adj]), " element is NULL. This is not allowed.", up = .up + 2)
+          #   x_all_tmp[[length(x_all_tmp) + 1]] = "__NULL__"
+          } else if(!is.null(x)){
+            # x_all_tmp[[length(x_all_tmp) + 1]] = x
+            # x_all_tmp[[paste("arg__", length(x_all_tmp) + 1)]] = x
+            x_all_tmp[[i - rm_adj]] = x
           }
         }
 
         # We put everything in the proper order
-        x_all = list()
-        x_all[1:n_dots] = NA
+        # x_all = list()
+        # x_all[1:n_dots] = NA
+        x_all = vector("list", n_dots)
 
         x_all[naked_order[1:length(x_all_tmp)]] = x_all_tmp
+        # for(i in 1:length(x_all_tmp)){
+        #   if(identical("__NULL__", x_all_tmp[[i]])){
+        #     x_all[[naked_order[i]]] = NULL
+        #   } else {
+        #     x_all[[naked_order[i]]] = x_all_tmp[[i]]
+        #   }
+        # }
+
+
         if(n_dots > length(x_all_tmp)){
           x_all[-naked_order[1:length(x_all_tmp)]] = x_dots
         }
@@ -2855,7 +2889,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
         if(is_list){
           IS_LIST = TRUE
         } else {
-          stop_up("In check_value_plus(), the argument '.x' must be a variable name or a list-element of the form x$element. Currently it is neither.")
+          # stop_up("In check_value_plus(), the argument '.x' must be a variable name or a list-element of the form x$element. Currently it is neither.")
         }
       }
 
@@ -2873,7 +2907,13 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
       x_names = deparse_long(mc[[".x"]])
     }
 
-    if(!missing(.arg_name) && missing(.message)) .message = paste0("__arg_name__(", .arg_name, ")")
+    if(missing(.message)){
+      if(!missing(.arg_name)){
+        .message = paste0("__arg_name__(", .arg_name, ")")
+      } else if(!missing(.prefix)){
+        .message = paste0("__prefix__(", .prefix, ")")
+      }
+    }
 
     IS_EVAL = grepl("eval", type_low, fixed = TRUE)
 
@@ -2889,7 +2929,9 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
 
   }
 
-
+  # RES: what will be returned by the function
+  # Only if IS_VALUE && IS_PLUS
+  RES = NULL
 
   if(!IS_DOTS){
     # IS_DOTS has been already evaluated
@@ -2959,16 +3001,18 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
           }
 
           if(IS_VALUE){
-            if(missing(.message)){
-              # if in value => it's an internal error (developer side, big error: this should NEVER happen)
-              stop_up("(Developer-side error.) The value '", x_names[i], "' could not be evaluated and arguments '.arg_name' and '.message' are both missing. This should never happen. Please revise the code accordingly so that the value passed to check_value", ifelse(IS_PLUS, "_plus", ""), " always exists. OR provide one of the arguments '.arg_name' or '.message'.")
+
+            if(!missing(.message)){
+              .message = paste0(.message, " The argument could not be evaluated.")
+            } else if(!missing(.arg_name)){
+              .message = paste0("Argument '", .arg_name, "' could not be evaluated.")
+            } else if(!missing(.prefix)){
+              .message = paste0(.prefix, " could not be evaluated.")
+            } else {
+              .message = paste0("Value '", x_names[i], "' could not be evaluated.")
             }
 
-            if(!missing(.arg_name)){
-              .message = paste0("Argument '", .arg_name, "' could not be evaluated.")
-            } else {
-              .message = paste0(.message, " The argument could not be evaluated.")
-            }
+
 
           } else {
             .message = paste0("Argument '", x_names[i], "' (equal to '", deparse_short(mc_origin[[x_names[i]]]), "') could not be evaluated.")
@@ -2989,7 +3033,10 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
             stop_up("The type evalset is not available in ", FUN_NAME, "(), use ", FUN_NAME, "_plus() instead.")
           }
 
-          assign(x_names[i], x, parent.frame(2))
+          if(!IS_VALUE || is.name(mc[[".x"]])){
+            assign(x_names[i], x, parent.frame(2))
+          }
+
         }
 
       } else {
@@ -3009,15 +3056,15 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
           }
 
           if(IS_VALUE){
-            if(missing(.message)){
-              # if in value => it's an internal error (developer side, big error: this should NEVER happen)
-              stop_up("(Developer-side error.) The value '", x_names[i], "' could not be evaluated and arguments '.arg_name' and '.message' are both missing. This should never happen, please revise the code accordingly so that the value passed to check_value", ifelse(IS_PLUS, "_plus", ""), " always exists. OR provide one of the arguments '.arg_name' or '.message'.")
-            }
 
-            if(!missing(.arg_name)){
-              .message = paste0("Argument '", .arg_name, "' could not be evaluated.")
-            } else {
+            if(!missing(.message)){
               .message = paste0(.message, " The argument could not be evaluated.")
+            } else if(!missing(.arg_name)){
+              .message = paste0("Argument '", .arg_name, "' could not be evaluated.")
+            } else if(!missing(.prefix)){
+              .message = paste0(.prefix, " could not be evaluated.")
+            } else {
+              .message = paste0("Value '", x_names[i], "' could not be evaluated.")
             }
 
           } else {
@@ -3149,9 +3196,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
 
   }
 
-  if(all(is_done)) return(NULL)
-
-  # if(FLAG == "null") return(NULL)
+  if(all(is_done)) return(x)
 
   #
   # Longer checks ####
@@ -3294,7 +3339,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
         check_typeof = nchar(my_type) >= 11
       }
 
-      check_len = check_equality = check_NAOK = TRUE
+      check_len = check_equality = check_NONA = TRUE
     } else if(grepl("list", my_type, fixed = TRUE)){
       #
       # __LIST ####
@@ -3404,7 +3449,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
         check_typeof = nchar(my_type) >= 11
       }
 
-      check_dim = check_equality = check_NAOK = TRUE
+      check_dim = check_equality = check_NONA = TRUE
     } else if(grepl("formula", my_type, fixed = TRUE)){
       #
       # __FORMULAS ####
@@ -3546,7 +3591,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
 
       }
 
-      if(all(is_done)) return(NULL)
+      if(all(is_done)) return(x)
 
       # We don't check further with formula
       next
@@ -3611,7 +3656,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
 
       }
 
-      if(all(is_done)) return(NULL)
+      if(all(is_done)) return(x)
 
       next
 
@@ -3803,24 +3848,29 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
           next
         } else {
 
+          x[] = res
+
           if(IS_LIST[k]){
             # we get the list, assign the value to the list, reassign back in the parent frame
             l_name = gsub("\\$.+", "", x_names[k])
             my_list = get(l_name, parent.frame(2))
             var_name = gsub(".+\\$", "", x_names[k])
-            my_list[[var_name]] = res
+            my_list[[var_name]] = x
             assign(l_name, my_list, parent.frame(2))
 
-          } else {
-            assign(x_names[k], res, parent.frame(2))
+          } else if(!IS_VALUE || is.name(mc[[".x"]])){
+            # if IS_VALUE here => then for re-assignment to apply, we enforce that .x is a variable name
+            assign(x_names[k], x, parent.frame(2))
           }
+
+          if(IS_VALUE) return(x)
 
           is_done[k] = TRUE
           next
         }
       }
 
-      if(all(is_done)) return(NULL)
+      if(all(is_done)) return(x)
 
       next
 
@@ -3853,7 +3903,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
         }
       }
 
-      if(all(is_done)) return(NULL)
+      if(all(is_done)) return(x)
 
       next
     } else if(grepl("function", my_type, fixed = TRUE)){
@@ -3893,7 +3943,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
 
       }
 
-      if(all(is_done)) return(NULL)
+      if(all(is_done)) return(x)
 
       next
 
@@ -4013,63 +4063,37 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
     #
 
     if(check_NAOK){
+      # ONLY scalar is concerned => x MUST be a scalar
+
       if(!(grepl("na ok", my_type, fixed = TRUE) || grepl("naok", my_type, fixed = TRUE))){
 
         for(k in which(!is_done_or_fail)){
 
-          x = x_all[[k]]
-
-          if(!any_NA_done[k]){
-            any_NA[k] = anyNA(x)
-            any_NA_done[k] = TRUE
-          }
-
-          if(any_NA[k]){
-            if(length(all_types) == 1 && length(x) > 1){
-              n_na = sum(is.na(x))
-              all_reasons[[k]][i] = paste0("it contains ", signif_plus(n_na), " NA", plural(n_na), " while it should be NA-free")
-            } else {
-              all_reasons[[k]][i] = "it contains NAs while it should be NA-free"
-            }
-
+          if(is.na(x_all[[k]])){
+            all_reasons[[k]][i] = "it is equal to NA while it should be NA-free"
             is_done_or_fail[k] = TRUE
-            next
+          } else {
+            x_omit[[k]] = x
           }
 
         }
 
         if(all(is_done_or_fail)) next
 
-      }
-
-      if(check_typeof && (grepl("integer", my_type, fixed = TRUE) || grepl("logical", my_type, fixed = TRUE))){
-        # We set x_omit => needed to check the integer/logical type
+      } else {
+        # NA tolerance: means that we check whether x == NA since x is a scalar
 
         for(k in which(!is_done_or_fail)){
 
-          if(!x_omit_done[k]){
-            x = x_all[[k]]
-
-            if(!any_NA_done[k]){
-              any_NA[k] = anyNA(x)
-              any_NA_done[k] = TRUE
-            }
-
-            if(any_NA[k]){
-              x_omit[[k]] = as.vector(x)[!is.na(as.vector(x))]
-              if(length(x_omit[[k]]) == 0){
-                is_done[k] = is_done_or_fail[k] = TRUE
-                next
-              }
-            } else {
-              x_omit[[k]] = x
-            }
-            x_omit_done[k] = TRUE
-
+          if(is.na(x_all[[k]])){
+            is_done[k] = is_done_or_fail[k] = TRUE
+          } else {
+            x_omit[[k]] = x
           }
+
         }
 
-        if(all(is_done)) return(NULL)
+        if(all(is_done)) return(x)
         if(all(is_done_or_fail)) next
 
       }
@@ -4088,7 +4112,13 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
           }
 
           if(any_NA[k]){
-            all_reasons[[k]][i] = "it contains NAs while it should be NA-free"
+            if(length(all_types) == 1 && !is.data.frame(x)){
+              n_na = sum(is.na(x))
+              all_reasons[[k]][i] = paste0("it contains ", signif_plus(n_na), " NA", plural(n_na), " while it should be NA-free")
+            } else {
+              all_reasons[[k]][i] = "it contains NAs while it should be NA-free"
+            }
+
             is_done_or_fail[k] = TRUE
             next
           }
@@ -4097,6 +4127,77 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
 
         if(all(is_done_or_fail)) next
 
+      } else if(check_typeof || check_equality){
+        # CONCERNS only matrix or vector
+        # Here: if only NA => stop now
+
+        # The difference betweenthe two if sections:
+        # - in the first: always create x_omit (means we also always perform is.na)
+        # - in the 2nd: we create x_omit iff first and last values of x are NA
+
+        if(grepl("integer", my_type, fixed = TRUE) ||
+           (grepl("logical", my_type, fixed = TRUE) && grepl("loose", my_type, fixed = TRUE))){
+
+          # 1) we create x_omit + take care of only NA vectors
+
+          for(k in which(!is_done_or_fail)){
+
+            if(!x_omit_done[k]){
+              x = x_all[[k]]
+
+              if(!any_NA_done[k]){
+                any_NA[k] = anyNA(x)
+                any_NA_done[k] = TRUE
+              }
+
+              if(any_NA[k]){
+                x_omit[[k]] = as.vector(x)[!is.na(as.vector(x))]
+                if(length(x_omit[[k]]) == 0){
+                  is_done[k] = is_done_or_fail[k] = TRUE
+                  next
+                }
+              } else {
+                x_omit[[k]] = x
+              }
+              x_omit_done[k] = TRUE
+
+            }
+          }
+
+          if(all(is_done)) return(x)
+          if(all(is_done_or_fail)) next
+
+        } else {
+          # 2) We take care of only NA vectors
+          # On en profite pour creer x_omit
+
+          for(k in which(!is_done_or_fail)){
+
+            if(!x_omit_done[k]){
+              x = x_all[[k]]
+
+              # The usual case: vectors are NOT full NA
+              # so we perform is.na on full vector only if first and last values are NA
+              if(is.na(x[1]) && is.na(x[length(x)])){
+                any_NA[k] = TRUE
+                any_NA_done[k] = TRUE
+
+                qui_NA = is.na(as.vector(x))
+                if(all(qui_NA)){
+                  is_done[k] = is_done_or_fail[k] = TRUE
+                  next
+                } else if(is.numeric(x) || is.logical(x)){
+                  x_omit[[k]] = as.vector(x)[!qui_NA]
+                }
+                x_omit_done[k] = TRUE
+              }
+
+            }
+          }
+
+          if(all(is_done)) return(x)
+          if(all(is_done_or_fail)) next
+        }
       }
     }
 
@@ -4122,7 +4223,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
 
                 if(IS_PLUS && (is.logical(x) || is.integer(x)) && grepl("conv", my_subtype, fixed = TRUE)){
                   # we coerce logical and integers into numeric
-                  x = as.numeric(x)
+                  storage.mode(x) = "double"
 
                   # START::CHUNK(conv_assign)
                   if(IS_LIST[k]){
@@ -4132,7 +4233,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
                     var_name = gsub(".+\\$", "", x_names[k])
                     my_list[[var_name]] = x
                     assign(l_name, my_list, parent.frame(2))
-                  } else {
+                  } else if(!IS_VALUE || is.name(mc[[".x"]])){
                     assign(x_names[k], x, parent.frame(2))
                   }
                   # END::CHUNK(conv_assign)
@@ -4175,7 +4276,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
                       stop_up("In the type '", my_type, "', for the sub-type integer, the keyword 'large' is not compatible with the keyword 'conv' (since large integers cannot be converted with as.integer(x)).")
                     }
 
-                    x = as.integer(x)
+                    storage.mode(x) = "integer"
 
                     # START::COPY(conv_assign)
                   if(IS_LIST[k]){
@@ -4184,7 +4285,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
                     var_name = gsub(".+\\$", "", x_names[k])
                     my_list[[var_name]] = x
                     assign(l_name, my_list, parent.frame(2))
-                  } else {
+                  } else if(!IS_VALUE || is.name(mc[[".x"]])){
                     assign(x_names[k], x, parent.frame(2))
                   }
                     # END::COPY(conv_assign)
@@ -4201,7 +4302,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
 
               } else if(IS_PLUS && grepl("conv", my_subtype, fixed = TRUE)){
                 # Anything atomic CAN be converted
-                x = as.character(x)
+                storage.mode(x) = "character"
                 is_done[k] = TRUE
 
                 # START::COPY(conv_assign)
@@ -4211,7 +4312,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
                     var_name = gsub(".+\\$", "", x_names[k])
                     my_list[[var_name]] = x
                     assign(l_name, my_list, parent.frame(2))
-                  } else {
+                  } else if(!IS_VALUE || is.name(mc[[".x"]])){
                     assign(x_names[k], x, parent.frame(2))
                   }
                 # END::COPY(conv_assign)
@@ -4235,7 +4336,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
                     var_name = gsub(".+\\$", "", x_names[k])
                     my_list[[var_name]] = x
                     assign(l_name, my_list, parent.frame(2))
-                  } else {
+                  } else if(!IS_VALUE || is.name(mc[[".x"]])){
                     assign(x_names[k], x, parent.frame(2))
                   }
                 # END::COPY(conv_assign)
@@ -4247,12 +4348,12 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
               if(is.logical(x)){
                 ok_subtypes = TRUE
                 break
-              } else if(!grepl("strict", my_subtype, fixed = TRUE) && (is_num && all(x_omit[[k]] %in% c(0, 1)))){
+              } else if(grepl("loose", my_subtype, fixed = TRUE) && (is_num && all(x_omit[[k]] %in% c(0, 1)))){
                 ok_subtypes = TRUE
 
                 if(IS_PLUS && grepl("conv", my_subtype, fixed = TRUE)){
                   # we coerce logical and integers into numeric
-                  x = as.logical(x)
+                  storage.mode(x) = "logical"
 
                   # START::COPY(conv_assign)
                   if(IS_LIST[k]){
@@ -4261,7 +4362,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
                     var_name = gsub(".+\\$", "", x_names[k])
                     my_list[[var_name]] = x
                     assign(l_name, my_list, parent.frame(2))
-                  } else {
+                  } else if(!IS_VALUE || is.name(mc[[".x"]])){
                     assign(x_names[k], x, parent.frame(2))
                   }
                   # END::COPY(conv_assign)
@@ -4300,7 +4401,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
             }
 
             if(IS_PLUS && (is.integer(x) || is.logical(x)) && grepl("conv", my_type, fixed = TRUE)){
-              x = as.numeric(x)
+              storage.mode(x) = "double"
               # START::COPY(conv_assign)
                   if(IS_LIST[k]){
                     l_name = gsub("\\$.+", "", x_names[k])
@@ -4308,7 +4409,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
                     var_name = gsub(".+\\$", "", x_names[k])
                     my_list[[var_name]] = x
                     assign(l_name, my_list, parent.frame(2))
-                  } else {
+                  } else if(!IS_VALUE || is.name(mc[[".x"]])){
                     assign(x_names[k], x, parent.frame(2))
                   }
               # END::COPY(conv_assign)
@@ -4366,7 +4467,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
                 stop_up("In the type '", my_type, "', for the sub-type integer, the keyword 'large' is not compatible with the keyword 'conv' (since large integers cannot be converted to 32bit integers with as.integer(x)).")
               }
 
-              x = as.integer(x)
+              storage.mode(x) = "integer"
 
               # START::COPY(conv_assign)
                   if(IS_LIST[k]){
@@ -4375,7 +4476,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
                     var_name = gsub(".+\\$", "", x_names[k])
                     my_list[[var_name]] = x
                     assign(l_name, my_list, parent.frame(2))
-                  } else {
+                  } else if(!IS_VALUE || is.name(mc[[".x"]])){
                     assign(x_names[k], x, parent.frame(2))
                   }
               # END::COPY(conv_assign)
@@ -4384,7 +4485,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
           } else if(grepl("character", my_type, fixed = TRUE)){
             if(IS_PLUS && grepl("conv", my_type, fixed = TRUE)){
               # Every atomic element can be converted to character
-              x = as.character(x)
+              storage.mode(x) = "character"
               is_done[k] = TRUE
 
               # START::COPY(conv_assign)
@@ -4394,7 +4495,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
                     var_name = gsub(".+\\$", "", x_names[k])
                     my_list[[var_name]] = x
                     assign(l_name, my_list, parent.frame(2))
-                  } else {
+                  } else if(!IS_VALUE || is.name(mc[[".x"]])){
                     assign(x_names[k], x, parent.frame(2))
                   }
               # END::COPY(conv_assign)
@@ -4408,7 +4509,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
             }
           } else if(grepl("logical", my_type, fixed = TRUE) && !is.logical(x)){
 
-            if(grepl("strict", my_type, fixed = TRUE)){
+            if(!grepl("loose", my_type, fixed = TRUE)){
               all_reasons[[k]][i] = paste0("it is not of type logical (instead it is of type ", enumerate_items(class(x[1]), quote = TRUE), ")")
               is_done_or_fail[k] = TRUE
               next
@@ -4429,7 +4530,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
 
             # if here => fine
             if(IS_PLUS && grepl("conv", my_type, fixed = TRUE)){
-              x = as.logical(x)
+              storage.mode(x) = "logical"
 
               # START::COPY(conv_assign)
                   if(IS_LIST[k]){
@@ -4438,7 +4539,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
                     var_name = gsub(".+\\$", "", x_names[k])
                     my_list[[var_name]] = x
                     assign(l_name, my_list, parent.frame(2))
-                  } else {
+                  } else if(!IS_VALUE || is.name(mc[[".x"]])){
                     assign(x_names[k], x, parent.frame(2))
                   }
               # END::COPY(conv_assign)
@@ -4457,7 +4558,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
                     var_name = gsub(".+\\$", "", x_names[k])
                     my_list[[var_name]] = x
                     assign(l_name, my_list, parent.frame(2))
-                  } else {
+                  } else if(!IS_VALUE || is.name(mc[[".x"]])){
                     assign(x_names[k], x, parent.frame(2))
                   }
               # END::COPY(conv_assign)
@@ -4474,7 +4575,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
 
       }
 
-      if(all(is_done)) return(NULL)
+      if(all(is_done)) return(x)
       if(all(is_done_or_fail)) next
     }
 
@@ -4517,14 +4618,14 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
 
         # GE
         if(grepl("ge{", my_type, fixed = TRUE)){
-          # return(NULL)
+
           value = extract_curly(my_type_raw, "ge")
 
           if(is.na(value)){
             stop_up("Problem in the evaluation of ge{expr} in ", my_type_raw, ". The expression in ge{} is ill-formed.")
           }
 
-          # return(NULL)
+
           if(any(x_omit[[k]] < value)){
             all_reasons[[k]][i] = paste0(msg, "strictly lower than ", signif_plus(value, 5, commas = FALSE))
             is_done_or_fail[k] = TRUE
@@ -4589,7 +4690,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
     # If we're here, this means that's fine!
     is_done[!is_done_or_fail] = TRUE
     # Out of the loop
-    if(all(is_done)) return(NULL)
+    if(all(is_done)) return(x)
 
   }
 
