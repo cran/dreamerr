@@ -1,6 +1,22 @@
 # NEWS for `dreamerr`
 
-## Version 1.2.1
+## Version 1.2.2
+
+#### Bug fixes
+
+  - fix bugs in `sfill`:
+  
+    * when an anchor was provided and all characters before that were of the same length.
+    
+    * when an anchor was provided and the fill was from the right.
+
+#### User visible changes
+
+ - `check_`family: objects are now returned invisibly.
+ 
+ - new function `fsignif` which is an alias of `signif_plus`.
+
+## Version 1.2.1 (31-08-2020)
 
 #### Bug fixes
 

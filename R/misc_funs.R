@@ -112,7 +112,7 @@ setDreamerr_dev.mode = function(dev.mode = FALSE){
 
 #' Sets argument checking on/off "semi-globally"
 #'
-#' You can allow your users to turn off argument checking within your function by using \code{set_check}. Only the functions \code{\link[dreamerr]{check_arg}} nd \code{\link[dreamerr]{check_value}} can be turned off that way.
+#' You can allow your users to turn off argument checking within your function by using \code{set_check}. Only the functions \code{\link[dreamerr]{check_arg}} nd \code{\link[dreamerr:check_arg]{check_value}} can be turned off that way.
 #'
 #' @param x A logical scalar, no default.
 #'
@@ -903,9 +903,9 @@ n_letter = function(n){
 
 
 
-#' Formatting for numbers to appear in-text
+#' Formatting numbers with display of significant digits
 #'
-#' Formatting of numbers, when they are to appear in messages. Displays only significant digits in a "nice way" and adds commas to separate thousands.
+#' Formatting of numbers, when they are to appear in messages. Displays only significant digits in a "nice way" and adds commas to separate thousands. It does much less than the \code{\link[base]{format}} function, but also a bit more though.
 #'
 #' @param x A numeric vector.
 #' @param s The number of significant digits to be displayed. Defaults to 2. All digits not in the decimal are always shown.
@@ -921,14 +921,14 @@ n_letter = function(n){
 #' x[sample(1e5, 1e4, TRUE)] = NA
 #'
 #' # Dumb function telling the number of NA values
-#' tell_na = function(x) message("x contains ", signif_plus(sum(is.na(x))), " NA values.")
+#' tell_na = function(x) message("x contains ", fsignif(sum(is.na(x))), " NA values.")
 #'
 #' tell_na(x)
 #'
 #' # Some differences with signif:
 #' show_diff = function(x, d = 2) cat("signif(x, ", d, ") -> ", signif(x, d),
-#'                                    " vs signif_plus(x, ", d, ") -> ",
-#'                                    signif_plus(x, d), "\n", sep = "")
+#'                                    " vs fsignif(x, ", d, ") -> ",
+#'                                    fsignif(x, d), "\n", sep = "")
 #'
 #' # Main difference is for large numbers
 #' show_diff(95123.125)
@@ -938,7 +938,7 @@ n_letter = function(n){
 #' show_diff(pi / 500)
 #'
 #'
-signif_plus = function (x, s = 2, r = 0, commas = TRUE){
+fsignif = signif_plus = function (x, s = 2, r = 0, commas = TRUE){
   # This is not intended to be applied to large vectors (not efficient)
   # Only for the in-print formatting of some numbers
 
@@ -994,6 +994,9 @@ signif_plus = function (x, s = 2, r = 0, commas = TRUE){
 
   res
 }
+
+#' @rdname fsignif
+"signif_plus"
 
 
 fit_screen = function(msg){
@@ -1077,13 +1080,18 @@ sfill = function(x = "", n = NULL, symbol = " ", right = FALSE, anchor){
   IS_ANCHOR = FALSE
   if(!missing(anchor)){
     if(nchar(anchor) != 1){
-      stop("If provided, argument 'anchor' must be a single character (currenlty it is of length ", nchar(symbol), ").")
+      stop("If provided, argument 'anchor' must be a single character (currenlty it is of length ", nchar(anchor), ").")
     }
     IS_ANCHOR = TRUE
     x_origin = x
     is_x_anchor = grepl(anchor, x, fixed = TRUE)
     x_split = strsplit(x, anchor, fixed = TRUE)
-    x = sapply(x_split, function(v) v[1])
+    if(right){
+      x = sapply(x_split, function(v) v[length(v)])
+    } else {
+      x = sapply(x_split, function(v) v[1])
+    }
+
   }
 
   if(!is.null(n) && n == 0) return(x)
@@ -1093,7 +1101,7 @@ sfill = function(x = "", n = NULL, symbol = " ", right = FALSE, anchor){
 
   n2fill = n - n_all
   qui = which(n2fill > 0)
-  if(length(qui) == 0) return(x)
+  if(length(qui) == 0 && !IS_ANCHOR) return(x)
 
   if(symbol == " "){
     if(right == TRUE){
@@ -1117,7 +1125,12 @@ sfill = function(x = "", n = NULL, symbol = " ", right = FALSE, anchor){
   if(IS_ANCHOR){
     for(i in seq_along(x_split)){
       if(is_x_anchor[i]){
-        x_split[[i]][1] = res[i]
+        if(right){
+          x_split[[i]][length(x_split[[i]])] = res[i]
+        } else {
+          x_split[[i]][1] = res[i]
+        }
+
         res[i] = paste(x_split[[i]], collapse = anchor)
       }
     }

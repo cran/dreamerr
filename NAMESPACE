@@ -9,7 +9,7 @@ export(stop_up, warn_up)
 
 # Other
 export(n_letter, n_th, n_times)
-export(signif_plus)
+export(signif_plus, fsignif)
 export(ifsingle, ifunit, plural, plural_len, enumerate_items)
 export(sfill)
 
