@@ -1,5 +1,22 @@
 # NEWS for `dreamerr`
 
+## Version 1.2.3
+
+#### Bug fixes
+
+  - in `check_arg_plus` conversion of factors to characters now works properly.
+  
+  - Fix bug in `stop_up` when the argument `up` was not appropriately set by the user.
+
+  - fix bug in `sfill` regading the combined usage of `anchor` and `right` in special circumstances.
+  
+#### New features
+  
+  - now `sfill` accepts 0-length vectors.
+  
+  - new exported function: `fit_screen`.
+
+
 ## Version 1.2.2
 
 #### Bug fixes

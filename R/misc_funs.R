@@ -280,7 +280,7 @@ validate_dots = function(valid_args = c(), suggest_args = c(), message, warn, st
     my_call = ""
     if(stop == FALSE && warn == FALSE){
       if(call.){
-        my_call = deparse(sys.calls()[[sys.nframe() - 1]])[1] # call can have svl lines
+        my_call = deparse(sys.calls()[[max(1, sys.nframe() - 1)]])[1] # call can have svl lines
         nmax = 70
         if(nchar(my_call) > nmax) my_call = paste0(substr(my_call, 1, nmax-1), "...")
         my_call = paste0(my_call, "\n")
@@ -389,7 +389,7 @@ stop_up = function(..., up = 1){
   }
 
   # The original call
-  my_call = deparse(sys.calls()[[sys.nframe() - (1 + up)]])[1] # call can have svl lines
+  my_call = deparse(sys.calls()[[max(1, sys.nframe() - (1 + up))]])[1] # call can have svl lines
   nmax = 50
   if(nchar(my_call) > nmax) my_call = paste0(substr(my_call, 1, nmax - 1), "...")
 
@@ -411,7 +411,7 @@ warn_up = function(..., up = 1, immediate. = FALSE){
   }
 
   # The original call
-  my_call = deparse(sys.calls()[[sys.nframe() - (1 + up)]])[1] # call can have svl lines
+  my_call = deparse(sys.calls()[[max(1, sys.nframe() - (1 + up))]])[1] # call can have svl lines
   nmax = 50
   if(nchar(my_call) > nmax) my_call = paste0(substr(my_call, 1, nmax - 1), "...")
 
@@ -999,13 +999,33 @@ fsignif = signif_plus = function (x, s = 2, r = 0, commas = TRUE){
 "signif_plus"
 
 
-fit_screen = function(msg){
+
+#' Nicely fits a message in the current R console
+#'
+#' Utility to display long messages with nice formatting. This function cuts the message to fit the current screen width of the R console. Words are never cut in the middle.
+#'
+#' @param msg Text message: character vector.
+#' @param width The maximum width of the screen the message should take. Default is 0.9.
+#'
+#' @details
+#' This function does not handle tabulations.
+#'
+#' @return
+#' It returns a single character vector with line breaks at the appropriate width.
+#'
+#' @examples
+#'
+#' cat(fit_screen(enumerate_items(state.name, nmax = Inf)))
+#'
+#' cat(fit_screen(enumerate_items(state.name, nmax = Inf), 0.5))
+#'
+fit_screen = function(msg, width = 0.9){
   # makes a message fit the current screen, by cutting the text at the appropriate location
   # msg must be a character string of length 1
 
   # Note that \t are NOT handled
 
-  MAX_WIDTH = getOption("width") * 0.9
+  MAX_WIDTH = getOption("width") * width
 
   res = c()
 
@@ -1043,6 +1063,7 @@ fit_screen = function(msg){
 #' @param n A positive integer giving the total expected length of each character string. Can be NULL (default). If \code{NULL}, then \code{n} is set to the maximum number of characters in \code{x} (i.e. \code{max(nchar(x))}).
 #' @param symbol Character scalar, default to \code{" "}. The symbol used to fill.
 #' @param right Logical, default is \code{FALSE}. Whether the character vector should be filled on the left( default) or on the right.
+#' @param na Character that will replace any NA value in input. Default is "NA".
 #' @param anchor Character scalar, can be missing. If provided, the filling is done up to this anchor. See examples.
 #'
 #' @return
@@ -1064,16 +1085,18 @@ fit_screen = function(msg){
 #' cat(sep = "\n", sfill(x))
 #' cat(sep = "\n", sfill(x, anchor = "."))
 #'
-sfill = function(x = "", n = NULL, symbol = " ", right = FALSE, anchor){
+sfill = function(x = "", n = NULL, symbol = " ", right = FALSE, anchor, na = "NA"){
   # Character vectors starting with " " are not well taken care of
 
-  check_arg_plus(x, "character vector conv")
+  check_arg_plus(x, "l0 character vector conv")
+  if(length(x) == 0) return(character(0))
+
   check_arg(n, "NULL integer scalar GE{0}")
   check_arg(symbol, "character scalar")
   check_arg(right, "logical scalar")
   check_arg(anchor, "character scalar")
 
-  x[is.na(x)] = "NA"
+  x[is.na(x)] = na
 
   if(nchar(symbol) != 1) stop("Argument 'symbol' must be a single character (currenlty it is of length ", nchar(symbol), ").")
 
@@ -1087,10 +1110,12 @@ sfill = function(x = "", n = NULL, symbol = " ", right = FALSE, anchor){
     is_x_anchor = grepl(anchor, x, fixed = TRUE)
     x_split = strsplit(x, anchor, fixed = TRUE)
     if(right){
-      x = sapply(x_split, function(v) v[length(v)])
+      x = sapply(x_split, function(v) v[max(length(v), 1)])
     } else {
       x = sapply(x_split, function(v) v[1])
     }
+
+    x[is.na(x)] = ""
 
   }
 

@@ -4311,7 +4311,8 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
 
               } else if(IS_PLUS && grepl("conv", my_subtype, fixed = TRUE)){
                 # Anything atomic CAN be converted
-                storage.mode(x) = "character"
+                # Storage mode does not work on factors
+                x = as.character(x)
                 is_done[k] = TRUE
 
                 # START::COPY(conv_assign)
@@ -4494,7 +4495,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
           } else if(grepl("character", my_type, fixed = TRUE)){
             if(IS_PLUS && grepl("conv", my_type, fixed = TRUE)){
               # Every atomic element can be converted to character
-              storage.mode(x) = "character"
+              x = as.character(x)
               is_done[k] = TRUE
 
               # START::COPY(conv_assign)
