@@ -23,6 +23,6 @@ Useful links:
 
 }
 \author{
-\strong{Maintainer}: Laurent Berge \email{laurent.berge@uni.lu}
+\strong{Maintainer}: Laurent Berge \email{laurent.berge@u-bordeaux.fr}
 
 }

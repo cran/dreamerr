@@ -1,8 +1,8 @@
 
 
 # Functions to export -- main
-export(check_arg, check_arg_plus)
-export(check_value, check_value_plus)
+export(check_arg, check_arg_plus, check_set_arg)
+export(check_value, check_value_plus, check_set_value)
 export(validate_dots)
 
 export(stop_up, warn_up)

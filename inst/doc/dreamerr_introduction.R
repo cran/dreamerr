@@ -33,7 +33,7 @@ plot_cor = function(x, y = NULL, line.opts = list(), ...){
   # y: 
   #  - numeric vector of the same length as x
   # - if y is NULL, then x with some noise is assigned to it 
-  check_arg_plus(y, "NULL{x + rnorm(length(x))} numeric vector len(data)", .data = x)
+  check_set_arg(y, "NULL{x + rnorm(length(x))} numeric vector len(data)", .data = x)
   
   # We ensure line.opts is a list (even of 0-length)
   check_arg(line.opts, "named list L0")
@@ -49,11 +49,11 @@ plot_cor = function(x, y = NULL, line.opts = list(), ...){
   # - if not provided => "firebrick"
   # - partially matched to firebrick or darkblue
   # - otherwise, a positive integer or a character scalar
-  check_arg_plus(line.opts$col, "NULL{'firebrick'} match(firebrick, darkblue) | scalar(integer, character) GE{0}") 
+  check_set_arg(line.opts$col, "NULL{'firebrick'} match(firebrick, darkblue) | scalar(integer, character) GE{0}") 
   # lwd:
   # - if not provided => 2
   # - otherwise a positive integer scalar
-  check_arg_plus(line.opts$lwd, "integer scalar GE{0} NULL{2}") # check + default
+  check_set_arg(line.opts$lwd, "integer scalar GE{0} NULL{2}") # check + default
   
   line.opts$a = reg
   do.call("abline", line.opts)
@@ -93,7 +93,7 @@ lm_check = function(formula, data, subset, weights, na.action, method = "qr", mo
 
   # method:
   # - either 'qr' or 'model.frame', partially matched
-  check_arg_plus(method, "match(qr, model.frame)")
+  check_set_arg(method, "match(qr, model.frame)")
 
   # You can pool arguments of the same type:
   check_arg(model, x, y, qr, singular.ok, "logical scalar")
@@ -132,7 +132,7 @@ lm_check_bis = function(formula, data, subset, weights, na.action, method = "qr"
 
   # Below: same as before
   check_arg(na.action, "null function arg(1,)")
-  check_arg_plus(method, "match(qr, model.frame)")
+  check_set_arg(method, "match(qr, model.frame)")
   check_arg(model, x, y, qr, singular.ok, "logical scalar")
   check_arg(contrasts, "null list")
   

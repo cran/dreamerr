@@ -327,6 +327,7 @@ validate_dots = function(valid_args = c(), suggest_args = c(), message, warn, st
 #' @param ... Objects that will be coerced to character and will compose the error message.
 #' @param up The number of frames up, default is 1. The call in the error message will be based on the function \code{up} frames up the stack. See examples. If you have many calls to \code{stop_up}/\code{warn_up} with a value of \code{up} different than one, you can use \code{\link[dreamerr]{set_up}} to change the default value of \code{up} within the function.
 #' @param immediate. Whether the warning message should be prompted directly. Defaults to \code{FALSE}.
+#' @param msg A character vector, default is \code{NULL}. If provided, this message will be displayed right under the error message. This is mostly useful when the text contains formatting because the function \code{\link{stop}} used to send the error message erases any formatting.
 #'
 #' @details
 #' These functions are really made for package developers to facilitate the good practice of providing informative user-level error/warning messages.
@@ -377,9 +378,9 @@ validate_dots = function(valid_args = c(), suggest_args = c(), message, warn, st
 #' main_function(1, 1:2)
 #'
 #'
-stop_up = function(..., up = 1){
+stop_up = function(..., up = 1, msg = NULL){
 
-  message = paste0(...)
+  main_msg = paste0(...)
 
   # up with set_up
   mc = match.call()
@@ -393,7 +394,19 @@ stop_up = function(..., up = 1){
   nmax = 50
   if(nchar(my_call) > nmax) my_call = paste0(substr(my_call, 1, nmax - 1), "...")
 
-  stop("in ", my_call, ":\n ", fit_screen(message), call. = FALSE)
+  intro = paste0("in ", my_call)
+
+  main_msg = fit_screen(main_msg)
+
+  if(!is.null(msg)){
+    if(length(msg) > 1){
+      msg = paste(msg, collapse = "")
+    }
+    msg = fit_screen(msg)
+    on.exit(message(msg))
+  }
+
+  stop(intro, ": \n", main_msg, call. = FALSE)
 
 }
 
@@ -418,7 +431,6 @@ warn_up = function(..., up = 1, immediate. = FALSE){
   warning("In ", my_call, ":\n ", fit_screen(message), call. = FALSE, immediate. = immediate.)
 
 }
-
 
 
 
@@ -942,10 +954,19 @@ fsignif = signif_plus = function (x, s = 2, r = 0, commas = TRUE){
   # This is not intended to be applied to large vectors (not efficient)
   # Only for the in-print formatting of some numbers
 
+  # It would supa dupa simple in c++...
+
+  if(is.character(x)){
+    return(x)
+  }
+
+  if(!is.numeric(x)){
+    stop("The argumnent 'x' must be numeric.")
+  }
 
   commas_single = function(x, s, r){
 
-    if (!is.finite(x) || abs(x) < 1) return(as.character(x))
+    if(!is.finite(x) || abs(x) < 1) return(as.character(x))
 
     if((p <- ceiling(log10(abs(x)))) < s){
       r = max(r, s - p)
@@ -972,16 +993,18 @@ fsignif = signif_plus = function (x, s = 2, r = 0, commas = TRUE){
       sol = c(sol, quoi[i])
       if (i%%3 == 0 && i != n) sol = c(sol, ",")
     }
+
     res = paste0(ifelse(x_sign == -1, "-", ""), paste0(rev(sol), collapse = ""), dec_string)
+
     res
   }
 
   signif_single = function(x, s, r) {
-    if (is.na(x)) {
+    if(is.na(x)) {
       return(NA)
     }
 
-    if (abs(x) >= 10^(s - 1)){
+    if(abs(x) >= 10^(s - 1)){
       return(round(x, r))
     } else {
       return(signif(x, s))
@@ -991,6 +1014,16 @@ fsignif = signif_plus = function (x, s = 2, r = 0, commas = TRUE){
   res = sapply(x, signif_single, s = s, r = r)
 
   if(commas) res = sapply(res, commas_single, s = s, r = r)
+
+  qui0 = grepl("^0.", res, perl = TRUE)
+  if(any(qui0)){
+    qui_short = nchar(res) < s + 2
+    if(any(qui_short)){
+      for(i in which(qui0)[qui_short]){
+        res[i] = as.vector(sprintf("%s%.*s", res[i], s + 2 - nchar(res[i]), "0000000000000000"))
+      }
+    }
+  }
 
   res
 }
@@ -1006,6 +1039,7 @@ fsignif = signif_plus = function (x, s = 2, r = 0, commas = TRUE){
 #'
 #' @param msg Text message: character vector.
 #' @param width The maximum width of the screen the message should take. Default is 0.9.
+#' @param leading_ws Logical, default is \code{TRUE}. Whether to keep the leading white spaces when the line is cut.
 #'
 #' @details
 #' This function does not handle tabulations.
@@ -1015,11 +1049,22 @@ fsignif = signif_plus = function (x, s = 2, r = 0, commas = TRUE){
 #'
 #' @examples
 #'
-#' cat(fit_screen(enumerate_items(state.name, nmax = Inf)))
+#' # A long message of two lines with a few leading spaces
+#' msg = enumerate_items(state.name, nmax = Inf)
+#' msg = paste0("     ", gsub("Michigan, ", "\n", msg))
 #'
-#' cat(fit_screen(enumerate_items(state.name, nmax = Inf), 0.5))
+#' # by default the message takes 90% of the screen
+#' cat(fit_screen(msg))
 #'
-fit_screen = function(msg, width = 0.9){
+#' # Now we reduce it to 50%
+#' cat(fit_screen(msg, 0.5))
+#'
+#' # we add leading_ws = FALSE to avoid the continuation of leading WS
+#' cat(fit_screen(msg, 0.5, FALSE))
+#'
+#' # The
+#'
+fit_screen = function(msg, width = 0.9, leading_ws = TRUE){
   # makes a message fit the current screen, by cutting the text at the appropriate location
   # msg must be a character string of length 1
 
@@ -1036,17 +1081,39 @@ fit_screen = function(msg, width = 0.9){
       res = c(res, m)
     } else {
       # we apply a splitting algorithm
-      m_split = strsplit(m, " ", fixed = TRUE)[[1]]
+
+      lead_ws = gsub("^([ \t]*).*", "\\1", m, perl = TRUE)
+      m = trimws(m)
+      N_LEAD = nchar(lead_ws)
+      add_lead = TRUE
+      first = TRUE
+
+      m_split = strsplit(m, "(?<=[^ ]) ", perl = TRUE)[[1]]
 
       while(TRUE){
-        where2split = which.max(cumsum(nchar(m_split) + 1) - 1 > MAX_WIDTH) - 1
-        res = c(res, paste(m_split[1:where2split], collapse = " "))
-        m_split = m_split[-(1:where2split)]
 
-        if(sum(nchar(m_split) + 1) - 1 <= MAX_WIDTH){
-          res = c(res, paste(m_split, collapse = " "))
+        if(add_lead){
+          width = MAX_WIDTH - N_LEAD
+          prefix = lead_ws
+        } else {
+          width = MAX_WIDTH
+          prefix = ""
+        }
+
+        if(sum(nchar(m_split) + 1) - 1 <= width){
+          res = c(res, paste0(prefix, paste(m_split, collapse = " ")))
           break
         }
+
+        where2split = which.max(cumsum(nchar(m_split) + 1) - 1 > width) - 1
+        res = c(res, paste0(prefix, paste(m_split[1:where2split], collapse = " ")))
+        m_split = m_split[-(1:where2split)]
+
+        if(!leading_ws && first){
+          add_lead = FALSE
+          first = FALSE
+        }
+
       }
     }
   }
@@ -1088,7 +1155,7 @@ fit_screen = function(msg, width = 0.9){
 sfill = function(x = "", n = NULL, symbol = " ", right = FALSE, anchor, na = "NA"){
   # Character vectors starting with " " are not well taken care of
 
-  check_arg_plus(x, "l0 character vector conv")
+  check_set_arg(x, "l0 character vector conv")
   if(length(x) == 0) return(character(0))
 
   check_arg(n, "NULL integer scalar GE{0}")

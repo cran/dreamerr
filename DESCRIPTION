@@ -1,8 +1,8 @@
 Package: dreamerr
 Type: Package
 Title: Error Handling Made Easy
-Version: 1.2.3
-Authors@R: person("Laurent", "Berge", email = "laurent.berge@uni.lu", role = c("aut", "cre"))
+Version: 1.3.0
+Authors@R: person("Laurent", "Berge", email = "laurent.berge@u-bordeaux.fr", role = c("aut", "cre"))
 Imports: Formula, utils
 Suggests: knitr, rmarkdown, stats, graphics
 Description: Set of tools to facilitate package development and make R a more user-friendly place. Mostly for developers (or anyone who writes/shares functions). Provides a simple, powerful and flexible way to check the arguments passed to functions. 
@@ -11,11 +11,10 @@ License: GPL-3
 Encoding: UTF-8
 VignetteBuilder: knitr
 BugReports: https://github.com/lrberge/dreamerr/issues
-LazyData: true
-RoxygenNote: 7.1.1
+RoxygenNote: 7.2.0
 NeedsCompilation: no
-Packaged: 2020-12-04 17:01:08 UTC; laurent.berge
+Packaged: 2023-08-23 19:26:12 UTC; lrberge
 Author: Laurent Berge [aut, cre]
-Maintainer: Laurent Berge <laurent.berge@uni.lu>
+Maintainer: Laurent Berge <laurent.berge@u-bordeaux.fr>
 Repository: CRAN
-Date/Publication: 2020-12-05 05:40:15 UTC
+Date/Publication: 2023-08-23 21:30:02 UTC

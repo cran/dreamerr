@@ -1,5 +1,30 @@
 # NEWS for `dreamerr`
 
+## Version 1.3.0
+
+### Bug fixes
+
+ - fixes `fit_screen` so that it does not mess with white spaces.
+
+### Name changes
+
+  - Functions `check_arg_plus` and `check_value_plus` become `check_set_arg` and `check_set_value` to improve clarity.
+
+### Improvements
+
+ - `fsignif` now displays trailing 0s appropriately and is neutral to character vectors (instead of throwing an error).
+ 
+ - the comparison types now can evaluate values from the calling frame:
+```r
+z = 32
+x = 77
+try(check_value(x, "numeric scalar LE{z}"))
+#> Error: in check_value(x, "numeric scalar LE{z}"):
+#>  Value 'x' must be a numeric scalar lower than, or equal to, 32. Problem: it is strictly greater than 32.
+```
+
+ - `stop_up` now accepts the argument msg which is an extra message displayed right after the error message.
+
 ## Version 1.2.3
 
 #### Bug fixes
@@ -8,7 +33,7 @@
   
   - Fix bug in `stop_up` when the argument `up` was not appropriately set by the user.
 
-  - fix bug in `sfill` regading the combined usage of `anchor` and `right` in special circumstances.
+  - fix bug in `sfill` regarding the combined usage of `anchor` and `right` in special circumstances.
   
 #### New features
   
