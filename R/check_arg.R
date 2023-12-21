@@ -326,6 +326,20 @@ send_error = function(all_reasons, x_name, type, message, choices = NULL, up, .v
       all_requested_types[i] = req_type
 
       next
+    } else if(grepl("path", my_type)){
+      #
+      # PATH
+      #
+      
+      is_dir = grepl("dir", my_type, fixed = TRUE)
+      is_read = grepl("read", my_type, fixed = TRUE)
+      is_create = grepl("create", my_type, fixed = TRUE)
+      
+      req_type = sma("a path to {&is_read;an existing }{&is_dir;directory;file}")
+
+      all_requested_types[i] = req_type
+
+      next
     } else if(grepl("function", my_type)){
       #
       # FUNCTION
@@ -560,7 +574,7 @@ send_error = function(all_reasons, x_name, type, message, choices = NULL, up, .v
           the_null_argument = ifelse(nchar(add_null) > 0, " The (nullable) argument", " Argument")
         }
 
-        msg_start = paste0(the_null_argument, " '", x_name, "' must be ")
+        msg_start = paste0(the_null_argument, " `", x_name, "` must be ")
       }
     }
 
@@ -646,7 +660,7 @@ send_error = function(all_reasons, x_name, type, message, choices = NULL, up, .v
 }
 
 
-extract_curly = function(type, x, as.string = FALSE){
+extract_curly = function(type, x, as.string = FALSE, envir = parent.frame(3)){
   # feed: gt{log(5)} => gives c(2, 3)
   # type = "scalarNumericgt{log(5)}lt{exp(3)}" ; x = "gt"
 
@@ -660,7 +674,7 @@ extract_curly = function(type, x, as.string = FALSE){
     if(!grepl("(", value2parse, fixed = TRUE)){
       res = as.numeric(value2parse)
     } else {
-      res = eval(parse(text = value2parse))
+      res = eval(parse(text = value2parse), envir)
     }
   }
 
@@ -1125,7 +1139,6 @@ inform_class = function(x, short = FALSE){
     res = paste0("it is of class ", enumerate_items(class(x), quote = TRUE))
   }
 
-
   res
 }
 
@@ -1178,8 +1191,32 @@ deparse_short = function(x){
 #' Full-fledged argument checking. Checks that the user provides arguments of the requested type (even complex) in a very simple way for the developer. Provides detailed and informative error messages for the user.
 #'
 #' @param .x An argument to be checked. Must be an argument name. Can also be the type, see details/examples.
-#' @param .type A character string representing the requested type(s) of the arguments. This is a bit long so please look at the details section or the vignette for explanations. Each type is composed of one main class and restrictions (optional). Types can be separated with pipes (\code{|}). The main classes are: i) \code{"scalar"} for scalars, i.e. vectors of length one, ii) \code{"vector"}, iii) \code{"matrix"}, iv) \code{"data.frame"}, v) \code{"list"}, vi) \code{formula}, vii) \code{function}, viii) \code{charin}, i.e. a character string in a set of choices, viii) \code{"match"}, i.e. a character scalar that should partially match a vector of choices, x) \code{"class(my_class1, my_class2)"}, i.e. an object whose class is any of the ones in parentheses, xi) \code{"NA"}, something identical to \code{NA}.
-#' You can then add optional restrictions: 1) \code{len(a, b)}, i.e. the object should be of length between \code{a} and \code{b} (you can leave \code{a} or \code{b} missing, \code{len(a)} means length *equal* to \code{a}), \code{len(data)} and \code{len(value)} are also possible (see details), 2) \code{nrow(a,b)} or \code{ncol(a,b)} to specify the expected number of rows or columns, 3) \code{arg(a,b)}, only for functions, to retrict the number of arguments, 4) \code{"na ok"} to allow the object to have NAs (for "scalar" types), or \code{"no na"} to restrict the object to have no NA (for "data.frame", "vector", and "matrix" types), 5) \code{GE}, \code{GT}, \code{LE} and \code{LT}: for numeric scalars/vectors/matrices, \code{GE{expr}} restrics the object to have only values striclty greater than (greater or equal/strictly lower than/lower or equal) the value in curly brackets, 6) e.g. \code{scalar(type1, type2)}, for scalars/vectors/matrices you can restrict the type of the object by adding the expected type in parentheses: should it be numeric, logical, etc.
+#' @param .type A character string representing the requested type(s) of the arguments. 
+#' This is a bit long so please look at the details section or the vignette for explanations. 
+#' Each type is composed of one main class and restrictions (optional). 
+#' Types can be separated with pipes (\code{|}). 
+#' The main classes are: i) \code{"scalar"} for scalars, i.e. vectors of length one, 
+#' ii) \code{"vector"}, iii) \code{"matrix"}, iv) \code{"data.frame"}, 
+#' v) \code{"list"}, vi) \code{formula}, vii) \code{function}, viii) \code{charin},
+#'  i.e. a character string in a set of choices, ix) \code{"match"},
+#'  i.e. a character scalar that should partially match a vector of choices, 
+#' x) `path`, a character scalar pointing to a file or directory, 
+#' xi) \code{"class(my_class1, my_class2)"}, i.e. an object whose class is any 
+#' of the ones in parentheses, xii) \code{"NA"}, something identical to \code{NA}.
+#' You can then add optional restrictions: 1) \code{len(a, b)}, i.e. the object
+#'  should be of length between \code{a} and \code{b} (you can leave \code{a} 
+#' or \code{b} missing, \code{len(a)} means length *equal* to \code{a}), 
+#' \code{len(data)} and \code{len(value)} are also possible (see details), 
+#' 2) \code{nrow(a,b)} or \code{ncol(a,b)} to specify the expected number of 
+#' rows or columns, 3) \code{arg(a,b)}, only for functions, to retrict the number 
+#' of arguments, 4) \code{"na ok"} to allow the object to have NAs (for "scalar" types), 
+#' or \code{"no na"} to restrict the object to have no NA (for "data.frame", "vector", 
+#' and "matrix" types), 5) \code{GE}, \code{GT}, \code{LE} and \code{LT}: 
+#' for numeric scalars/vectors/matrices, \code{GE{expr}} restrics the object 
+#' to have only values striclty greater than (greater or equal/strictly lower 
+#' than/lower or equal) the value in curly brackets, 6) e.g. \code{scalar(type1, type2)}, 
+#' for scalars/vectors/matrices you can restrict the type of the object by 
+#' adding the expected type in parentheses: should it be numeric, logical, etc.
 #' @param .x1 An argument to be checked. Must be an argument name. Can also be the type, see details/examples.
 #' @param .x2 An argument to be checked. Must be an argument name. Can also be the type, see details/examples.
 #' @param .x3 An argument to be checked. Must be an argument name. Can also be the type, see details/examples.
@@ -1190,7 +1227,13 @@ deparse_short = function(x){
 #' @param .x8 An argument to be checked. Must be an argument name. Can also be the type, see details/examples.
 #' @param .x9 An argument to be checked. Must be an argument name. Can also be the type, see details/examples.
 #' @param ... Only used to check \code{'...'} (dot-dot-dot) arguments.
-#' @param .message A character string, optional. By default, if the user provides a wrong argument, the error message stating what type of argument is required is automatically formed. You can alternatively provide your own error message, maybe more tailored to your function. The reason of why there is a problem is appended in the end of the message. You can use the special character \code{__ARG__} in the message. If found, \code{__ARG__} will be replaced by the appropriate argument name.
+#' @param .message A character string, optional. By default, if the user provides a 
+#' wrong argument, the error message stating what type of argument is required is 
+#' automatically formed. You can alternatively provide your own error message, 
+#' maybe more tailored to your function. The reason of why there is a problem is 
+#' appended in the end of the message. You can use the special character 
+#' \code{__ARG__} in the message. If found, \code{__ARG__} will be 
+#' replaced by the appropriate argument name.
 #' @param .choices Only if one of the types (in argument \code{type}) is \code{"match"}. The values the argument can take. Note that even if the \code{type} is \code{"match"}, this argument is optional since you have other ways to declare the choices.
 #' @param .data Must be a data.frame, a list or a vector. Used in three situations. 1) if the global keywords \code{eval} or \code{evalset} are present: the argument will also be evaluated in the data (i.e. the argument can be a variable name of the data set). 2) if the argument is expected to be a formula and \code{var(data)} is included in the type: then the formula will be expected to contain variables from \code{.data}. 3) if the keywords \code{len(data)}, \code{nrow(data)} or \code{ncol(data)} are requested, then the required length, number of rows/columns, will be based on the data provided in \code{.data}.
 #' @param .value An integer scalar or a named list of integers scalars. Used when the keyword \code{value} is present (like for instance in \code{len(value)}). If several values are to be provided, then it must be a named list with names equal to the codes: for instance if \code{nrow(value)} and \code{ncol(value)} are both present in the type, you can use (numbers are an example) \code{.value = list(nrow = 5, ncol = 6)}. See Section IV) in the examples.
@@ -1207,7 +1250,7 @@ deparse_short = function(x){
 #'
 #' A type MUST have at least one main class. For example: in the type \code{"logical vector len(,2) no na"}, \code{vector} is the main class, \code{no na} is the option, and \code{logical} and \code{len(,2)} are restrictions
 #'
-#' There are 13 main classes that can be checked. On the left the keyword, on the right what is expected from the argument, and in square brackets the related section in the examples:
+#' There are 14 main classes that can be checked. On the left the keyword, on the right what is expected from the argument, and in square brackets the related section in the examples:
 #' \itemize{
 #' \item \code{scalar}: an atomic vector of length 1 [Section I)]
 #' \item \code{vector}: an atomic vector [Section IV)]
@@ -1220,11 +1263,12 @@ deparse_short = function(x){
 #' \item \code{function}: a function [Section V)]
 #' \item \code{charin}: a character vector with values in a vector of choices [Section III)]
 #' \item \code{match}: a character vector with values in a vector of choices, partial matching enabled and only available in \code{check_set_arg} [Section III)]
+#' \item `path`: a character scalar pointing to a file or a directory
 #' \item \code{class}: a custom class [Section VI)]
 #' \item \code{NA}: a vector of length 1 equal to NA--does not support options nor restrictions, usually combined with other main classes (see Section on combining multiple types) [Section VI)]
 #' }
 #'
-#' There are seven type options, they are not available for each types. Here what they do and the types to which they are associated:
+#' There are eight type options, they are not available for each types. Here what they do and the types to which they are associated:
 #' \itemize{
 #' \item \code{NA OK} (or \code{NAOK}): Tolerates the presence of NA values. Available for \code{scalar}.
 #' \item \code{NO NA} (or \code{NONA}): Throws an error if NAs are present. Available for \code{vector}, \code{matrix}, \code{vmatrix}, \code{data.frame}, and \code{vdata.frame}.
@@ -1233,6 +1277,7 @@ deparse_short = function(x){
 #' \item \code{multi}: Allows multiple matches. Available for \code{charin}, \code{match}.
 #' \item \code{strict}: Makes the matching case-sensitive. Available for \code{match}.
 #' \item \code{os} and \code{ts}: Available for \code{formula}. Option \code{os} (resp. \code{ts}) enforces that the formula is one-sided (resp. two-sided).
+#' \item `dir`, `read` and `create`: Available for `path`. Option `dir` checks whether the path points to a directory and not a file. Option `read` checks whether the file actually exists and has read permission. Option `create` creates up to the grand-parent folder if it was not yet existing.
 #' }
 #'
 #' You can further add restrictions. There are roughly six types of restrictions. Here what they do and the types to which they are associated:
@@ -1280,7 +1325,7 @@ deparse_short = function(x){
 #' When the user doesn't provide the argument, the default is set to the first choice.
 #' Since the main class \code{match} performs a re-assignment of the variable, it is only available in \code{check_set_arg}.
 #'
-#' The main class \code{charin} is similar to \code{match} in that it expects a single character string in a set of choices. The main differences are: i) there is no partial matching, ii) the choices cannot be set by setting the argument default, and iii) its checking can be turned off with setDreamer_check(FALSE) [that's the main difference between \code{check_arg} and \code{check_set_arg}].
+#' The main class \code{charin} is similar to \code{match} in that it expects a single character string in a set of choices. The main differences are: i) there is no partial matching, ii) the choices cannot be set by setting the argument default, and iii) its checking can be turned off with setDreamer_check(FALSE) (that's the main difference between \code{check_arg} and \code{check_set_arg}).
 #'
 #'
 #'
@@ -1368,7 +1413,7 @@ deparse_short = function(x){
 #'
 #' @section Disabling argument checking:
 #'
-#' Although the argument checking offered by \code{check_arg} is highly optimized and fast (it depends on the type [and your computer], but it is roughly of the order of 80 micro seconds for non-missing arguments, 20 micro seconds for missing arguments), you may want to disable it for small functions in large loops (>100K iterations although this practice is not really common in R). If so, just use the function \code{\link[dreamerr]{setDreamerr_check}}, by typing \code{setDreamerr_check(FALSE)}. This will disable any call to \code{check_arg}.
+#' Although the argument checking offered by \code{check_arg} is highly optimized and fast (it depends on the type (and your computer), but it is roughly of the order of 80 micro seconds for non-missing arguments, 20 micro seconds for missing arguments), you may want to disable it for small functions in large loops (>100K iterations although this practice is not really common in R). If so, just use the function \code{\link[dreamerr]{setDreamerr_check}}, by typing \code{setDreamerr_check(FALSE)}. This will disable any call to \code{check_arg}.
 #'
 #' Note that the argument checking of \code{check_set_arg} cannot be disabled because the special types it allows perform reassignment in the upper frame. That's the main difference with \code{check_arg}.
 #'
@@ -2201,7 +2246,7 @@ check_arg = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9, ...
   # START::CHUNK(set_up)
   # It's faster to write it here than in check_arg_core (where we would need call evaluation)
   if(missing(.up)){
-    up_value = mget("DREAMERR__UP", parent.frame(), ifnotfound = 0)
+    up_value = mget("DREAMERR_UP", parent.frame(), ifnotfound = 0)
     .up = up_value[[1]]
   }
   # END::CHUNK(set_up)
@@ -2229,7 +2274,7 @@ check_set_arg = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9,
 
   # START::COPY(set_up)
   if(missing(.up)){
-    up_value = mget("DREAMERR__UP", parent.frame(), ifnotfound = 0)
+    up_value = mget("DREAMERR_UP", parent.frame(), ifnotfound = 0)
     .up = up_value[[1]]
   }
   # END::COPY(set_up)
@@ -2258,7 +2303,7 @@ check_value = function(.x, .type, .message, .arg_name, .prefix, .choices = NULL,
 
   # START::COPY(set_up)
   if(missing(.up)){
-    up_value = mget("DREAMERR__UP", parent.frame(), ifnotfound = 0)
+    up_value = mget("DREAMERR_UP", parent.frame(), ifnotfound = 0)
     .up = up_value[[1]]
   }
   # END::COPY(set_up)
@@ -2283,7 +2328,7 @@ check_set_value = function(.x, .type, .message, .arg_name, .prefix, .choices = N
 
   # START::COPY(set_up)
   if(missing(.up)){
-    up_value = mget("DREAMERR__UP", parent.frame(), ifnotfound = 0)
+    up_value = mget("DREAMERR_UP", parent.frame(), ifnotfound = 0)
     .up = up_value[[1]]
   }
   # END::COPY(set_up)
@@ -2313,7 +2358,9 @@ check_value_plus = check_set_value
 #### CORE FUNCTION ####
 ####
 
-check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9, ..., .message, .choices = NULL, .data = list(), .value, .env, .up = 0, .arg_name, .prefix, .mc, .is_plus = FALSE, .is_value = FALSE){
+check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9, ..., 
+                          .message, .choices = NULL, .data = list(), .value, .env, .up = 0, 
+                          .arg_name, .prefix, .mc, .is_plus = FALSE, .is_value = FALSE){
 
   # NOTA: the price to pay to using a core function called by user-level functions is about 4us. I think that's fair for the
   # clarity it adds to the code (and I hate duplication anyway).
@@ -2348,7 +2395,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
   # - evalset
 
   IS_VALUE = .is_value
-  IS_PLUS = .is_plus
+  IS_SET = .is_plus
 
   mc = .mc
 
@@ -2422,7 +2469,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
         n = length(mc_arg)
         x_names = character(n)
 
-        if(IS_PLUS){
+        if(IS_SET){
           # deparse costs more but it is required for lists
           for(i in 1:n) x_names[[i]] = deparse(mc_arg[[i]])
 
@@ -2452,14 +2499,14 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
       formal.args = NULL
 
       IS_MBT = NULL
-      if(IS_PLUS){
+      if(IS_SET){
         IS_MATCH = NULL
         IS_NULL_DEFAULT = NULL
       } else {
         IS_MATCH = FALSE
       }
 
-      if(IS_PLUS){
+      if(IS_SET){
         # list elements are NEVER missing, but can be NULL. List elements that are NULL are considered like missing
         is_missing = (match(x_names, args_origin, nomatch = 0) == 0) & !IS_LIST
       } else {
@@ -2483,9 +2530,9 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
 
             is_done[i] = TRUE
 
-            # if IS_PLUS => we set NULL{default} if needed + match
+            # if IS_SET => we set NULL{default} if needed + match
 
-            if(IS_PLUS){
+            if(IS_SET){
 
               if(is.null(IS_NULL_DEFAULT)) IS_NULL_DEFAULT = grepl("null{", type_low, fixed = TRUE)
 
@@ -2799,7 +2846,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
       is_done = rep(FALSE, n)
 
       # we need is match information
-      if(IS_PLUS){
+      if(IS_SET){
         IS_MATCH = grepl("match", type_low, fixed = TRUE)
       } else {
         IS_MATCH = FALSE
@@ -2922,12 +2969,12 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
 
     IS_DOTS = FALSE
 
-    # If IS_PLUS:
+    # If IS_SET:
     # - we find out if the object is an element in a list
     # - we enforce that the argument is a name or a list
     #
 
-    if(IS_PLUS){
+    if(IS_SET){
 
       sysOrigin = sys.parent(.up + 2)
 
@@ -2979,7 +3026,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
   }
 
   # RES: what will be returned by the function
-  # Only if IS_VALUE && IS_PLUS
+  # Only if IS_VALUE && IS_SET
   RES = NULL
 
   if(!IS_DOTS){
@@ -3009,7 +3056,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
       # Evaluation of the argument
       if(IS_EVAL){
 
-        if(IS_PLUS && IS_LIST[i]) stop_up("The keywords 'eval' and 'evalset' are not available when checking list elements.")
+        if(IS_SET && IS_LIST[i]) stop_up("The keywords 'eval' and 'evalset' are not available when checking list elements.")
 
         if(missing(.env)){
           .env = parent.frame(.up + 3)
@@ -3075,7 +3122,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
         #
         if(grepl("evalset", type_low, fixed = TRUE)){
 
-          if(!IS_PLUS){
+          if(!IS_SET){
             FUN_NAME = ifelse(IS_VALUE, "check_value", "check_arg")
             stop_up("The type evalset is not available in ", FUN_NAME, "(), use ", FUN_NAME, "_plus() instead.")
           }
@@ -3139,7 +3186,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
 
           if(grepl("null{", type_low, fixed = TRUE)){
 
-            if(!IS_PLUS){
+            if(!IS_SET){
               FUN_NAME = ifelse(IS_VALUE, "check_value", "check_arg")
               stop_up("The type NULL{default} is not available in ", FUN_NAME, "(), use ", FUN_NAME, "_plus() instead.")
             }
@@ -3167,7 +3214,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
             next
           }
 
-        } else if(IS_PLUS && IS_LIST[i]){
+        } else if(IS_SET && IS_LIST[i]){
           # List elements that are NULL are like missing
 
           if(is.null(IS_MBT)) IS_MBT = grepl("mbt", type_low, fixed = TRUE)
@@ -3713,7 +3760,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
       #
       IS_MATCH = TRUE
 
-      if(!IS_PLUS){
+      if(!IS_SET){
         FUN_NAME = ifelse(IS_VALUE, "check_value", "check_arg")
         stop_up("The main class 'match' is not available in ", FUN_NAME, "(), use ", FUN_NAME, "_plus() instead.")
       }
@@ -3783,9 +3830,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
 
         # Character coercion
         if(!is.character(x)) x = as.character(x)
-
-
-
+        
         pblm_match = FALSE
         if(is_strict){
           res_int = pmatch(x, choices, duplicates.ok = TRUE)
@@ -3921,6 +3966,162 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
 
       next
 
+    } else if(grepl("path", my_type, fixed = TRUE)){
+      ####
+      #### __PATH ####
+      ####      
+      
+      is_dir = grepl("dir", my_type, fixed = TRUE)
+      is_create = grepl("create", my_type, fixed = TRUE)
+      is_read = grepl("read", my_type, fixed = TRUE)
+      
+      for(k in which(!is_done)){
+        x = x_all[[k]]
+        
+        if(length(x) != 1){
+          all_reasons[[k]][i] = sma("it is not of length 1 (instead, it is of length {len?x})")
+          is_done_or_fail[k] = TRUE
+          next
+        }
+        
+        if(!is.character(x)){
+          all_reasons[[k]][i] = sma("it is not a character string, instead it is ",
+                                    "of class {enum.bq ? class(x)}")
+          is_done_or_fail[k] = TRUE
+          next
+        }
+        
+        if(is.na(x)){
+          all_reasons[[k]][i] = "it is equal to NA"
+          is_done_or_fail[k] = TRUE
+          next
+        }
+        
+        path = try(normalizePath(x, "/", mustWork = FALSE))
+        if("try-error" %in% class(path)){
+          path = try(normalizePath(paste0("./", x), "/", mustWork = FALSE))
+          if("try-error" %in% class(path)){
+            all_reasons[[k]][i] = paste0("the path ", x, " is not valid, please revise")
+            is_done_or_fail[k] = TRUE
+            next
+          }
+        }
+
+        # If path exists: fine!
+        ok = FALSE
+        if(is_dir){
+          ok = dir.exists(path)
+        } else {
+          ok = file.exists(path)
+        }
+        
+        if(ok){
+          if(is_read){
+            if(file.access(path, 4) != 0){
+              all_reasons[[k]][i] = "The path exists but you do not have read permission."
+              is_done_or_fail[k] = TRUE
+              next
+            }
+          } else {
+            if(file.access(path, 2) != 0){
+              all_reasons[[k]][i] = "The path exists but you do not have write permission."
+              is_done_or_fail[k] = TRUE
+              next
+            }
+          }
+          # otherwise, we're good
+          is_done[k] = TRUE
+          next
+        }
+
+        # Now the path does not exist already
+
+        # here: it must be an error
+        if(is_read){
+          # Let's find out the precise reason
+          path_debug = normalizePath(path, "/", mustWork = FALSE)
+    
+          full_pblm = FALSE
+          while(!file.exists(path_debug)){
+            if(!grepl("/", path_debug)){
+              full_pblm = TRUE
+              break
+            }  
+            path_debug = gsub("/[^/]*$", "", path_debug)
+          }
+          
+          if(full_pblm){
+            msg_pblm = "everything in the path is wrong, not even the start!"
+          } else if(dirname(path) == path_debug){
+            filename = basename(path)
+            msg_pblm = paste0("the file `", filename, "` does not exist in the folder `", 
+                              path_debug, "`")
+          } else {
+            file_not_exist = substr(path, nchar(path_debug) + 1, nchar(path))
+            msg_pblm = paste0("the path up to '", path_debug, 
+                              "' exists, but not after it (i.e. `",
+                              file_not_exist, "` does not)")
+          }
+            
+          all_reasons[[k]][i] = msg_pblm
+          is_done_or_fail[k] = TRUE
+          next
+        }
+
+        # Here we're in write
+        # behavior:
+        # - if parent exists fine
+        # - if not: we check the grand-grand parent:
+        #   * if exists: then we create the grand parent + parent if is_create
+        #   * if it does not: error
+         
+        path_parent = dirname(path)
+        if(dir.exists(path_parent)){
+          if(file.access(path_parent, 2) != 0){
+            all_reasons[[k]][i] = paste0("The parent folder exists (`", path_parent, "`)",
+                                         " but you do not have write permission")
+            is_done_or_fail[k] = TRUE
+            next
+          }
+          is_done[k] = TRUE
+          next
+        }
+
+        if(is_create){
+          # we allow: EXISTS/NOT_EXIST/NOT_EXIST/FILE_DIR
+          path_grand_parent = dirname(path_parent)
+          if(dir.exists(path_grand_parent)){
+            dir.create(path_parent)
+            is_done[k] = TRUE
+            next
+          }
+          
+          path_grand_grand_parent = dirname(path_grand_parent)
+          if(dir.exists(path_grand_grand_parent)){
+            dir.create(path_grand_parent)
+            dir.create(path_parent)
+            is_done[k] = TRUE
+            next
+          }
+          
+          msg_pblm = paste0("the path to the grand-grand parent directory of the path (`", 
+                            path_grand_grand_parent, "`) does not exist")
+          
+        } else {
+          msg_pblm = paste0("the path to the parent's directory of the path (`", 
+                            path_parent, "`) does not exist")
+          
+        }
+        
+        all_reasons[[k]][i] = msg_pblm
+        is_done_or_fail[k] = TRUE
+      }
+      
+      if(all(is_done)) return(invisible(path))
+
+      # We don't check further with paths
+      next
+      
     } else if(grepl("(^| )na( |$)", my_type)){
       #
       # __special NA type ####
@@ -4272,7 +4473,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
               if(is_num){
                 ok_subtypes = TRUE
 
-                if(IS_PLUS && (is.logical(x) || is.integer(x)) && grepl("conv", my_subtype, fixed = TRUE)){
+                if(IS_SET && (is.logical(x) || is.integer(x)) && grepl("conv", my_subtype, fixed = TRUE)){
                   # we coerce logical and integers into numeric
                   storage.mode(x) = "double"
 
@@ -4320,7 +4521,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
                   # If here: type is OK
 
                   # We check if conversion is needed
-                  if(IS_PLUS && grepl("conv", my_subtype, fixed = TRUE)){
+                  if(IS_SET && grepl("conv", my_subtype, fixed = TRUE)){
                     # We coerce logicals and numeric to integer
 
                     if(!ok_conv){
@@ -4351,7 +4552,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
                 ok_subtypes = TRUE
                 break
 
-              } else if(IS_PLUS && grepl("conv", my_subtype, fixed = TRUE)){
+              } else if(IS_SET && grepl("conv", my_subtype, fixed = TRUE)){
                 # Anything atomic CAN be converted
                 # Storage mode does not work on factors
                 x = as.character(x)
@@ -4376,7 +4577,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
               if(is.factor(x)){
                 ok_subtypes = TRUE
                 break
-              } else if(IS_PLUS && grepl("conv", my_subtype, fixed = TRUE)){
+              } else if(IS_SET && grepl("conv", my_subtype, fixed = TRUE)){
                 # Anything atomic CAN be converted
                 x = as.factor(x)
                 is_done[k] = TRUE
@@ -4403,7 +4604,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
               } else if(grepl("loose", my_subtype, fixed = TRUE) && (is_num && all(x_omit[[k]] %in% c(0, 1)))){
                 ok_subtypes = TRUE
 
-                if(IS_PLUS && grepl("conv", my_subtype, fixed = TRUE)){
+                if(IS_SET && grepl("conv", my_subtype, fixed = TRUE)){
                   # we coerce logical and integers into numeric
                   storage.mode(x) = "logical"
 
@@ -4452,7 +4653,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
               next
             }
 
-            if(IS_PLUS && (is.integer(x) || is.logical(x)) && grepl("conv", my_type, fixed = TRUE)){
+            if(IS_SET && (is.integer(x) || is.logical(x)) && grepl("conv", my_type, fixed = TRUE)){
               storage.mode(x) = "double"
               # START::COPY(conv_assign)
                   if(IS_LIST[k]){
@@ -4513,7 +4714,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
             }
 
             # If here => that's fine, now we check for conversion
-            if(IS_PLUS && grepl("conv", my_type, fixed = TRUE)){
+            if(IS_SET && grepl("conv", my_type, fixed = TRUE)){
 
               if(int_check_large == FALSE){
                 stop_up("In the type '", my_type, "', for the sub-type integer, the keyword 'large' is not compatible with the keyword 'conv' (since large integers cannot be converted to 32bit integers with as.integer(x)).")
@@ -4535,7 +4736,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
             }
 
           } else if(grepl("character", my_type, fixed = TRUE)){
-            if(IS_PLUS && grepl("conv", my_type, fixed = TRUE)){
+            if(IS_SET && grepl("conv", my_type, fixed = TRUE)){
               # Every atomic element can be converted to character
               x = as.character(x)
               is_done[k] = TRUE
@@ -4581,7 +4782,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
             }
 
             # if here => fine
-            if(IS_PLUS && grepl("conv", my_type, fixed = TRUE)){
+            if(IS_SET && grepl("conv", my_type, fixed = TRUE)){
               storage.mode(x) = "logical"
 
               # START::COPY(conv_assign)
@@ -4598,7 +4799,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
             }
 
           } else if(grepl("factor", my_type, fixed = TRUE)){
-            if(IS_PLUS && grepl("conv", my_type, fixed = TRUE)){
+            if(IS_SET && grepl("conv", my_type, fixed = TRUE)){
               # Every atomic element can be converted to character
               x = as.factor(x)
               is_done[k] = TRUE

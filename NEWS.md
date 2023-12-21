@@ -1,5 +1,22 @@
 # NEWS for `dreamerr`
 
+## Version 1.4.0
+
+### New functions
+
+- New set of `hook` error and warning functions for reporting in complex internal functions. These are `set_hook` to set a function as the hook and `stop_hook`/`warn_hook` error and warning functions used to report as if they were called from the hooked function.
+
+- `warni` and `stopi` for warning and stop functions with character interpolation using [stringmagic](https://github.com/lrberge/stringmagic)
+
+### New type
+
+- The type `path` has been added to `check_arg`. It is used to check paths.
+
+### Improvements
+
+- All warning and stop functions gain string interpolation with [stringmagic](https://github.com/lrberge/stringmagic).
+
+
 ## Version 1.3.0
 
 ### Bug fixes
