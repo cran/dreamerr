@@ -1,33 +1,60 @@
-# NEWS for `dreamerr`
 
-## Version 1.4.0
+# dreamerr 1.5.0
 
-### New functions
+## New features
+
+- the argument `.message` of the `check_` functions is now interpolated with `string_magic()`
+
+## User-level changes
+
+- the type `l0` has been removed. Now `check_arg(x, "vector")` (or the like) receiving something 0-length in input will not send an error (in the previous version, `l0` was required). Vector length can still be checked with the `len(a,b)` mechanism (thanks to @kylebutts for early bug reports).
+
+## Minor changes
+
+- to increase clarity, now the problem leading to an error is displayed in a newline with the prefix `PROBLEM` in uppercase
+
+- improve clarity of error messages involving lower than/greater than
+
+- improve the number of items suggested by `suggest_item`
+
+## Bug fixes
+
+- fix display problem in `fsignif`
+
+- increase the requirement of `stringmagic` version to be compatible with R v3.5.0
+
+- the `check_arg` family of functions now correctly reports the full call stack when requested
+
+- fix bug: wrong argument name displayed when `check_value` was used with the argument `.arg_name` and an error was produced because a variable was missing in a formula. Thanks to @kylebutts, #4.
+
+# dreamerr 1.4.0
+
+## New functions
 
 - New set of `hook` error and warning functions for reporting in complex internal functions. These are `set_hook` to set a function as the hook and `stop_hook`/`warn_hook` error and warning functions used to report as if they were called from the hooked function.
 
 - `warni` and `stopi` for warning and stop functions with character interpolation using [stringmagic](https://github.com/lrberge/stringmagic)
 
-### New type
+## New type
 
 - The type `path` has been added to `check_arg`. It is used to check paths.
 
-### Improvements
+## Improvements
 
 - All warning and stop functions gain string interpolation with [stringmagic](https://github.com/lrberge/stringmagic).
 
 
-## Version 1.3.0
+# dreamerr 1.3.0
 
-### Bug fixes
+## Bug fixes
 
  - fixes `fit_screen` so that it does not mess with white spaces.
 
-### Name changes
+## Name changes
 
   - Functions `check_arg_plus` and `check_value_plus` become `check_set_arg` and `check_set_value` to improve clarity.
 
-### Improvements
+## Improvements
 
  - `fsignif` now displays trailing 0s appropriately and is neutral to character vectors (instead of throwing an error).
  
@@ -42,7 +69,7 @@ try(check_value(x, "numeric scalar LE{z}"))
 
  - `stop_up` now accepts the argument msg which is an extra message displayed right after the error message.
 
-## Version 1.2.3
+# dreamerr 1.2.3
 
 #### Bug fixes
 
@@ -59,7 +86,7 @@ try(check_value(x, "numeric scalar LE{z}"))
   - new exported function: `fit_screen`.
 
 
-## Version 1.2.2
+# dreamerr 1.2.2
 
 #### Bug fixes
 
@@ -75,7 +102,7 @@ try(check_value(x, "numeric scalar LE{z}"))
  
  - new function `fsignif` which is an alias of `signif_plus`.
 
-## Version 1.2.1 (31-08-2020)
+# dreamerr 1.2.1 
 
 #### Bug fixes
 
@@ -88,7 +115,7 @@ try(check_value(x, "numeric scalar LE{z}"))
 
   - `validate_dots`: nicer messages.
 
-## Version 1.2.0 (08-06-2020)
+# dreamerr 1.2.0 
 
 #### Important changes (no retro compatibility)
 
@@ -156,7 +183,7 @@ z
  - Type conversion of matrices returned a vector, now corrected.
 
 
-## Version 1.1.0 (2020-05-03)
+# dreamerr 1.1.0 
 
 #### New functions
 
@@ -199,7 +226,7 @@ z
  - Bug when in `n_letter` when negative numbers are in. This bug propagated into `check_arg`.
 
 
-## First version: 1.0.0 (2020-04-12)
+# dreamerr 1.0.0 
 
 This package is the outcome of over a decade of coding and developing packages in R. As a package developer I always wanted my code to be "safe": so that if a user provides arguments of the good type the functions always work, and if there's an argument of the wrong type then an informative error message is shown. 
 

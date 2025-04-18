@@ -1,7 +1,7 @@
 ## ----setup, include=FALSE-----------------------------------------------------
 knitr::opts_chunk$set(echo = TRUE, eval = TRUE)
 
-## ---- echo = FALSE------------------------------------------------------------
+## ----echo = FALSE-------------------------------------------------------------
 library(dreamerr)
 x = 1:5
 y = pt
@@ -14,13 +14,13 @@ sum_check = function(...){
 Sys.setenv(LANG = "en")
 
 
-## ---- error = TRUE------------------------------------------------------------
+## ----error = TRUE-------------------------------------------------------------
 sum(x, y)
 
-## ---- error = TRUE------------------------------------------------------------
+## ----error = TRUE-------------------------------------------------------------
 sum_check(x, y)
 
-## ---- eval = FALSE------------------------------------------------------------
+## ----eval = FALSE-------------------------------------------------------------
 #  sum_check = function(...){
 #    check_arg(..., "numeric vector")
 #    sum(...)
@@ -35,8 +35,8 @@ plot_cor = function(x, y = NULL, line.opts = list(), ...){
   # - if y is NULL, then x with some noise is assigned to it 
   check_set_arg(y, "NULL{x + rnorm(length(x))} numeric vector len(data)", .data = x)
   
-  # We ensure line.opts is a list (even of 0-length)
-  check_arg(line.opts, "named list L0")
+  # We ensure line.opts is a list
+  check_arg(line.opts, "named list")
   
   # The linear regression + options from ...
   reg = lm(y ~ x, ...)

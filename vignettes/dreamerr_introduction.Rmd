@@ -146,9 +146,9 @@ The meaning of the classes is as follows:
     `fun = function(x = c("value1", "value2", etc))`.
  
  - **path**: a character scalar that should point to a directory or a file. 
- Option `dir` checks that the path points to a directory. Option `read` checks that 
- the file exists already and has read permission. Option `create` creates up to 
- the grand-parent and parent folders in case these do not exist.
+   Option `dir` checks that the path points to a directory. Option `read` checks that 
+   the file exists already and has read permission. Option `create` creates  
+   the grand-parent and parent folders in case these do not exist.
  
  - **class**: an object whose class is listed in parentheses. Example: if `class(lm, glm)`, 
  then only `lm` or `glm` arguments will be accepted.
@@ -198,9 +198,6 @@ type character string. These globals are:
    of the type `x$a` since `NULL` values in this case are often mistakes--especially 
    useful when the argument is a vector.
  
- - **L0**: allows the argument to be of 0-length (by default, there's always an 
-   error for 0-length arguments). 
- 
  - **eval**: evaluates the argument in a data set given in the argument `.data`.
  
  - **evalset**: evaluates the argument in a data set given in the argument `.data`, 
@@ -226,8 +223,8 @@ plot_cor = function(x, y = NULL, line.opts = list(), ...){
   # - if y is NULL, then x with some noise is assigned to it 
   check_set_arg(y, "NULL{x + rnorm(length(x))} numeric vector len(data)", .data = x)
   
-  # We ensure line.opts is a list (even of 0-length)
-  check_arg(line.opts, "named list L0")
+  # We ensure line.opts is a list
+  check_arg(line.opts, "named list")
   
   # The linear regression + options from ...
   reg = lm(y ~ x, ...)

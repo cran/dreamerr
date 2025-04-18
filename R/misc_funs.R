@@ -4,11 +4,6 @@
 # ~: small utilities
 #----------------------------------------------#
 
-####
-#### imports ####
-####
-
-sma = stringmagic::string_magic_alias(.check = FALSE)
 
 ####
 #### utilities ####
@@ -621,13 +616,12 @@ fsignif = signif_plus = function (x, s = 2, r = 0, commas = TRUE){
 
   if(commas) res = sapply(res, commas_single, s = s, r = r)
 
-  qui0 = grepl("^0.", res, perl = TRUE)
-  if(any(qui0)){
-    qui_short = nchar(res) < s + 2
-    if(any(qui_short)){
-      for(i in which(qui0)[qui_short]){
-        res[i] = as.vector(sprintf("%s%.*s", res[i], s + 2 - nchar(res[i]), "0000000000000000"))
-      }
+  qui0 = which(grepl("^0.", res, perl = TRUE))
+  if(length(qui0) > 0){
+    qui_short = nchar(res[qui0]) < s + 2
+    qui2fix = qui0[qui_short]
+    for(i in qui2fix){
+      res[i] = as.vector(sprintf("%s%.*s", res[i], s + 2 - nchar(res[i]), "0000000000000000"))
     }
   }
 
@@ -800,7 +794,7 @@ check_set_width = function(width_expr){
 sfill = function(x = "", n = NULL, symbol = " ", right = FALSE, anchor, na = "NA"){
   # Character vectors starting with " " are not well taken care of
 
-  check_set_arg(x, "l0 character vector conv")
+  check_set_arg(x, "character vector conv")
   if(length(x) == 0) return(character(0))
 
   check_arg(n, "NULL integer scalar GE{0}")
@@ -1123,7 +1117,7 @@ suggest_item = function(x, items, msg.write = FALSE, msg.newline = TRUE, msg.ite
         res = sma("\nFYI the {msg.item}s are: {sort, ', 'c ? items_origin}.")
       }
     } else {
-      res = sma("Maybe you meant {enum.bq.or ? res}?")
+      res = sma("Maybe you meant {enum.bq.or.20 ? res}?")
     }
 
     if(msg.newline && !grepl("^\n", res)){

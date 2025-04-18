@@ -4,10 +4,6 @@
 # ~: Ultimate control function
 #----------------------------------------------#
 
-# roxygen2::roxygenise(roclets = "rd")
-
-
-# type = "scalarNumericGT{5}LT{7}|NA|scalarLogical|matrix nrow(,5) ncol(2,5) GT{log(5)}"
 
 send_error = function(all_reasons, x_name, type, message, choices = NULL, up, .value, .data){
 
@@ -28,7 +24,7 @@ send_error = function(all_reasons, x_name, type, message, choices = NULL, up, .v
     IS_DOTS = TRUE
     text_problem = arg_name_header(x_name, problem = TRUE)
   } else {
-    text_problem = " Problem: "
+    text_problem = "\nPROBLEM: "
   }
 
   # start_with_value: specific to check_value // whether x refers to an argument or just a value
@@ -47,6 +43,10 @@ send_error = function(all_reasons, x_name, type, message, choices = NULL, up, .v
 
   if(!missing(message) && !is.null(message) && grepl("__ARG__", message, fixed = TRUE)){
     message = gsub("__ARG__", x_name, message)
+  }
+  
+  if(!missing(message) && !is.null(message) && grepl("{", message, fixed = TRUE)){
+    message = string_magic(message, .envir = parent.frame(3))
   }
 
   # We check the type is well formed
@@ -103,6 +103,19 @@ send_error = function(all_reasons, x_name, type, message, choices = NULL, up, .v
         n_expected = extract_par(my_type, "left", int = TRUE)
         msg = message_in_between(n_expected, "left", .value)
         req_type = paste0(req_type, ifelse(IS_RIGHT, " and ", " "), msg)
+      }
+      
+      if(grepl("var\\(", my_type) && all_main_types_ok[i]){
+        # We add information on data requirements
+        reason = all_reasons[i]
+        if(grepl("__varinfo__", reason, fixed = TRUE)){
+          extra = extract_curly(reason, "__varinfo__", as.string = TRUE)
+          all_reasons[i] = gsub("^.+\\}", "", reason)
+          req_type = paste0(req_type, " ", extra)
+        } else {
+          # nothing because the error is not from this cause
+        }
+        
       }
 
       all_requested_types[i] = req_type
@@ -170,10 +183,6 @@ send_error = function(all_reasons, x_name, type, message, choices = NULL, up, .v
         req_type = "a named list"
       } else {
         req_type = "a list"
-      }
-
-      if(grepl("(?i) l0", type)){
-        req_type = paste0(req_type, " (even empty)")
       }
 
 
@@ -653,9 +662,19 @@ send_error = function(all_reasons, x_name, type, message, choices = NULL, up, .v
   } else {
     full_msg = paste0(message, text_problem, error_msg)
   }
+  
+  show_full_stack = isTRUE(getOption("dreamerr_show_full_stack"))
+  if(show_full_stack){
+    sc = sys.calls()
+    my_call = sapply(sc, function(x) deparse(x, width.cutoff = 200L, nlines = 1))
+    my_call = sma("{'\n'c ! [{format.0 ? 1:length(my_call)}] {'100|...'k ? my_call}}")
 
+    my_call = paste0("the full stack is shown (set this off with setDreamerr_show_stack(FALSE))\n", my_call)
+  } else {
+    my_call = paste0("in ", my_call)
+  }
 
-  stop("in ", my_call, ":\n", fit_screen(full_msg), call. = FALSE)
+  stop(my_call, ":\n", fit_screen(full_msg), call. = FALSE)
 
 }
 
@@ -1233,7 +1252,7 @@ deparse_short = function(x){
 #' maybe more tailored to your function. The reason of why there is a problem is 
 #' appended in the end of the message. You can use the special character 
 #' \code{__ARG__} in the message. If found, \code{__ARG__} will be 
-#' replaced by the appropriate argument name.
+#' replaced by the appropriate argument name. Note that this message is interpolated with \code{string_magic()}.
 #' @param .choices Only if one of the types (in argument \code{type}) is \code{"match"}. The values the argument can take. Note that even if the \code{type} is \code{"match"}, this argument is optional since you have other ways to declare the choices.
 #' @param .data Must be a data.frame, a list or a vector. Used in three situations. 1) if the global keywords \code{eval} or \code{evalset} are present: the argument will also be evaluated in the data (i.e. the argument can be a variable name of the data set). 2) if the argument is expected to be a formula and \code{var(data)} is included in the type: then the formula will be expected to contain variables from \code{.data}. 3) if the keywords \code{len(data)}, \code{nrow(data)} or \code{ncol(data)} are requested, then the required length, number of rows/columns, will be based on the data provided in \code{.data}.
 #' @param .value An integer scalar or a named list of integers scalars. Used when the keyword \code{value} is present (like for instance in \code{len(value)}). If several values are to be provided, then it must be a named list with names equal to the codes: for instance if \code{nrow(value)} and \code{ncol(value)} are both present in the type, you can use (numbers are an example) \code{.value = list(nrow = 5, ncol = 6)}. See Section IV) in the examples.
@@ -1301,7 +1320,6 @@ deparse_short = function(x){
 #' \item \code{safe NULL}: allows the argument to be equal to \code{NULL}, but an error is thrown if the argument is of the type \code{base$variable} or \code{base[["variable"]]}. This is to prevent oversights from the user, especially useful when the main class is a vector.
 #' \item \code{NULL{expr}}: allows the argument to be equal to \code{NULL}, if the argument is \code{NULL}, then it assigns the value of expr to the argument.
 #' \item \code{MBT}: (means "must be there") an error is thrown if the argument is not provided by the user.
-#' \item \code{L0}: allows 0-length vectors--overrides the default which requires that any argument should have a positive length
 #' \item \code{eval}: used in combination with the extra argument \code{.data}. Evaluates the value of the argument both in the data set and in the environment (this means the argument can be a variable name).
 #' \item \code{evalset}: like \code{eval}, but after evaluation, assigns the obtained value to the argument. Only available in \code{check_set_arg}.
 #' \item \code{dotnames}: only when checking \code{'...'} argument (see the related section below). Enforces that each object in \code{'...'} has a name.
@@ -1489,7 +1507,7 @@ deparse_short = function(x){
 #'
 #'
 #' #
-#' # II) Examples for the globals: NULL, L0, MBT, eval, evalset
+#' # II) Examples for the globals: NULL, MBT, eval, evalset
 #' #
 #'
 #' test_globals = function(xnum, xlog = TRUE, xint){
@@ -1501,8 +1519,7 @@ deparse_short = function(x){
 #'   # NULL allows NULL values
 #'   check_arg(xlog, "logical scalar safe NULL")
 #'
-#'   # use L0 to accept length-0 objects
-#'   check_arg(xint, "integer vector L0")
+#'   check_arg(xint, "integer vector")
 #'
 #'   list(xnum = xnum, xlog = xlog)
 #' }
@@ -1523,11 +1540,6 @@ deparse_short = function(x){
 #' # but xnum accepts it
 #' test_globals(iris$log)
 #'
-#' # L0 means not NULL, 0-length vectors are OK
-#' # 0-length is OK for xint:
-#' test_globals(xnum = 2, xint = integer(0))
-#' # L0 still checks the type:
-#' try(test_globals(2, xint = numeric(0)))
 #'
 #' #
 #' # eval and evalset
@@ -1888,7 +1900,7 @@ deparse_short = function(x){
 #' #
 #'
 #' # You can check multiple types using a pipe: '|'
-#' # Note that global keywords (like NULL, eval, l0, etc) need not be
+#' # Note that global keywords (like NULL, eval, etc) need not be
 #' # separated by pipes. They can be anywhere, the following are identical:
 #' #  - "character scalar | data.frame NULL"
 #' #  - "NULL character scalar | data.frame"
@@ -2062,8 +2074,8 @@ deparse_short = function(x){
 #'
 #'   check_arg(x, y, "numeric vector")
 #'
-#'   # First we ensure the arguments are lists (even of 0-length)
-#'   check_arg(lm.opts, plot.opts, line.opts, "named list L0")
+#'   # First we ensure the arguments are lists
+#'   check_arg(lm.opts, plot.opts, line.opts, "named list")
 #'
 #'   # The linear regression
 #'   lm.opts$formula = y ~ x
@@ -2358,6 +2370,7 @@ check_value_plus = check_set_value
 #### CORE FUNCTION ####
 ####
 
+
 check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9, ..., 
                           .message, .choices = NULL, .data = list(), .value, .env, .up = 0, 
                           .arg_name, .prefix, .mc, .is_plus = FALSE, .is_value = FALSE){
@@ -2403,6 +2416,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
     #
     # CHECK ARG ####
     #
+    
 
     # We need the current call (both to identify the dots and to get the type)
     current_call = sys.call(sys.nframe() - 1)
@@ -2853,13 +2867,11 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
       }
 
       #
-      # We now check nullity and 0-length
+      # We now check nullity 
       #
 
       # Since we've already evaluated the values of x_all, we create a shorter loop here
       # => it avoids checking for multiple IS_DOTS in the default loop
-      # However, the checking of L0 is identical => so we copy the code here
-      # => do no edit it by hand!
       #
 
 
@@ -2890,53 +2902,6 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
           }
         }
 
-        # DO NOT EDIT BY HAND! => edit in CHUNK(L0)
-        # START::COPY(L0)
-      x_len = length(x)
-      if(length(x_len) == 1 && x_len == 0){
-        if(grepl("l0", type_low, fixed = TRUE)){
-
-          if(is.list(x)){
-            if(grepl("list", type_low, fixed = TRUE)){
-              is_done[i] = TRUE
-              next
-            } else {
-              send_error("it is a list", x_name = x_names[i], type = type, message = .message, choices = .choices, up = .up, .value = .value, .data = .data)
-            }
-          } else {
-            is_int = grepl("integer", type_low, fixed = TRUE)
-            is_num = grepl("numeric", type_low, fixed = TRUE)
-            is_log = grepl("logical", type_low, fixed = TRUE)
-            n_types = is_int + is_num + is_log
-            if(n_types == 3){
-              is_done[i] = TRUE
-              next
-
-            } else if(n_types == 0){
-              if(grepl("list", type_low, fixed = TRUE)){
-                send_error("it is a list", x_name = x_names[i], type = type, message = .message, choices = .choices, up = .up, .value = .value, .data = .data)
-              } else {
-                is_done[i] = TRUE
-                next
-              }
-
-            } else {
-              ok = class(x)[1] %in% c("integer", "numeric", "logical")[c(is_int, is_num, is_log)]
-              if(ok){
-                is_done[i] = TRUE
-                next
-              } else {
-                msg = paste0("it is of length 0 and of type '", class(x)[1], "'")
-                send_error(msg, x_name = x_names[i], type = type, message = .message, choices = .choices, up = .up, .value = .value, .data = .data)
-              }
-            }
-          }
-
-        } else {
-          send_error("it is of length 0, while it should have a positive length", x_name = x_names[i], type = type, message = .message, choices = .choices, up = .up, .value = .value, .data = .data)
-        }
-      }
-        # END::COPY(L0)
       }
 
     }
@@ -3229,64 +3194,14 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
             next
           }
         } else {
-          send_error("it is NULL", x_name = x_names[i], type = type, message = .message, choices = .choices, up = .up, .value = .value, .data = .data)
+          x_all[i] = list(NULL)
         }
+      } else {
+        # if here we will perform the full check, so we save the value of x
+        x_all[[i]] = x
       }
-
-      # START::CHUNK(L0)
-      x_len = length(x)
-      if(length(x_len) == 1 && x_len == 0){
-        # I do that, only to handle Formulas..... damn! I'm not happy with that
-        if(grepl("l0", type_low, fixed = TRUE)){
-
-          if(is.list(x)){
-            if(grepl("list", type_low, fixed = TRUE)){
-              is_done[i] = TRUE
-              next
-            } else {
-              send_error("it is a list", x_name = x_names[i], type = type, message = .message, choices = .choices, up = .up, .value = .value, .data = .data)
-            }
-          } else {
-            is_int = grepl("integer", type_low, fixed = TRUE)
-            is_num = grepl("numeric", type_low, fixed = TRUE)
-            is_log = grepl("logical", type_low, fixed = TRUE)
-            n_types = is_int + is_num + is_log
-            if(n_types == 3){
-              is_done[i] = TRUE
-              next
-
-            } else if(n_types == 0){
-              if(grepl("list", type_low, fixed = TRUE)){
-                send_error("it is a list", x_name = x_names[i], type = type, message = .message, choices = .choices, up = .up, .value = .value, .data = .data)
-              } else {
-                is_done[i] = TRUE
-                next
-              }
-
-            } else {
-              ok = class(x)[1] %in% c("integer", "numeric", "logical")[c(is_int, is_num, is_log)]
-              if(ok){
-                is_done[i] = TRUE
-                next
-              } else {
-                msg = paste0("it is of length 0 and of type '", class(x)[1], "'")
-                send_error(msg, x_name = x_names[i], type = type, message = .message, choices = .choices, up = .up, .value = .value, .data = .data)
-              }
-            }
-          }
-
-        } else {
-          send_error("it is of length 0, while it should have a positive length", x_name = x_names[i], type = type, message = .message, choices = .choices, up = .up, .value = .value, .data = .data)
-        }
-      }
-      # END::CHUNK(L0)
-
-      # if here we will perform the full check, so we save the value of x
-      x_all[[i]] = x
 
     }
-
-
 
   }
 
@@ -3404,6 +3319,10 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
       for(k in which(!is_done)){
 
         x = x_all[[k]]
+        
+        if(is.null(x)){
+          next
+        }
 
         if(!is.atomic(x) || !is.null(dim(x))){
           all_reasons[[k]][i] = paste0("it is not a vector, ", inform_class(x, TRUE))
@@ -3454,9 +3373,13 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
         if(grepl("named", my_type, fixed = TRUE)){
           # special type for lists
           if(is.null(names(x))){
-            all_reasons[[k]][i] = "it does not have a name attribute"
-            is_done_or_fail[k] = TRUE
-            next
+            if(length(x) == 0){
+              # OK
+            } else {
+              all_reasons[[k]][i] = "it does not have a name attribute"
+              is_done_or_fail[k] = TRUE
+              next
+            }
           }
         }
 
@@ -3625,20 +3548,23 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
                     stop_up("You cannot use the type 'var(data)' (in '.type = ", my_type_raw, "') when the argument '.data' is missing. Please provide the argument '.data'.")
                   } else {
 
-                    info_arg = arg_name_header(x_names[i])
-                    stop_up(info_arg, " is a formula that must contain variables from the data set given in argument '", data_dp, "'. Problem: this data set has no variable.", up = .up + 2)
+                    all_reasons[[k]][i] = paste0("__varinfo__{whose variables must be in the data set given in argument '", data_dp, "'}the data set has no variable")
+                    is_done_or_fail[k] = TRUE
+                    next
                   }
 
                 } else if(is.null(names(.data))){
-                  info_arg = arg_name_header(x_names[i])
                   msg = ifelse(is.list(.data), "is a list but has no names attribute.", "is not a data.frame nor a list.")
-                  stop_up(info_arg, " is a formula that must contain variables from the data set given in argument '", deparse_long(mc[[".data"]]), "'. Problem: this data set ", msg, up = .up + 2)
+                  all_reasons[[k]][i] = paste0("__varinfo__{whose variables must be in the data set given in argument '", deparse_long(mc[[".data"]]), "'}the data set ", msg)
+                  is_done_or_fail[k] = TRUE
+                  next
 
                 } else {
                   x_pblm = setdiff(x_vars, names(.data))
                   if(length(x_pblm) > 0){
-                    info_arg = arg_name_header(x_names[i])
-                    stop_up(info_arg, " is a formula whose variables must be in the data set given in argument '", deparse_long(mc[[".data"]]), "'. Problem: the variable", enumerate_items(x_pblm, "s.is.quote"), " not in the data.", up = .up + 2)
+                    all_reasons[[k]][i] = paste0("__varinfo__{whose variables must be in the data set given in argument '", deparse_long(mc[[".data"]]), "'}", sma("the variable{$s, enum.q, is ? x_pblm} not in the data"))
+                    is_done_or_fail[k] = TRUE
+                    next
                   }
                 }
               } else if(!missing(.data) && !is.null(names(.data))){
@@ -3670,9 +3596,9 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
                 } else {
                   msg = "in the environment"
                 }
-
-                info_arg = arg_name_header(x_names[i])
-                stop_up(info_arg, " is a formula whose variables must be ", msg, ". Problem: the variable", enumerate_items(x_real_pblm, "s.isn't.quote"), " there.", up = .up + 2)
+                all_reasons[[k]][i] = paste0("__varinfo__{whose variables must be ", msg, "}", sma("the variable{$s, enum.q, is ? x_pblm} not there"))
+                is_done_or_fail[k] = TRUE
+                next
 
               }
 
@@ -4206,9 +4132,9 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
     is_num = FALSE
 
     #
-    # ...len ####
+    # ... len ####
     #
-
+    
     if(check_len && grepl("len(", my_type, fixed = TRUE)){
 
       for(k in which(!is_done_or_fail)){
@@ -4233,8 +4159,9 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
     }
 
     #
-    # ...ncol + nrow ####
+    # ... ncol + nrow ####
     #
+    
 
     if(check_dim && (grepl("nrow(", my_type, fixed = TRUE) || grepl("ncol(", my_type, fixed = TRUE))){
 
@@ -4307,7 +4234,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
     }
 
     #
-    # ...NA ####
+    # ... NA ####
     #
 
     if(check_NAOK){
@@ -4383,7 +4310,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
         # CONCERNS only matrix or vector
         # Here: if only NA => stop now
 
-        # The difference betweenthe two if sections:
+        # The difference between the two if sections:
         # - in the first: always create x_omit (means we also always perform is.na)
         # - in the 2nd: we create x_omit iff first and last values of x are NA
 
@@ -4396,6 +4323,10 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
 
             if(!x_omit_done[k]){
               x = x_all[[k]]
+              
+              if(length(x) == 0){
+                next
+              }
 
               if(!any_NA_done[k]){
                 any_NA[k] = anyNA(x)
@@ -4427,6 +4358,10 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
 
             if(!x_omit_done[k]){
               x = x_all[[k]]
+              
+              if(length(x) == 0){
+                next
+              }
 
               # The usual case: vectors are NOT full NA
               # so we perform is.na on full vector only if first and last values are NA
@@ -4454,7 +4389,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
     }
 
     #
-    # ...Typeof ####
+    # ... Typeof ####
     #
 
     if(check_typeof){
@@ -4464,6 +4399,11 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
         for(k in which(!is_done_or_fail)){
 
           x = x_all[[k]]
+          
+          if(length(x) == 0){
+            # if length 0: nothing to be checked
+            next
+          }
 
           is_num = is.numeric(x) || is.logical(x)
 
@@ -4643,6 +4583,11 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
         for(k in which(!is_done_or_fail)){
 
           x = x_all[[k]]
+          
+          if(length(x) == 0){
+            # if length 0: nothing to be checked
+            next
+          }
 
           is_num = is.numeric(x) || is.logical(x)
 
@@ -4833,7 +4778,7 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
     }
 
     #
-    # ...Equality ####
+    # ... Equality ####
     #
 
     if(check_equality && (grepl("ge{", my_type, fixed = TRUE) || grepl("gt{", my_type, fixed = TRUE) || grepl("le{", my_type, fixed = TRUE) || grepl("lt{", my_type, fixed = TRUE))){
@@ -4842,6 +4787,11 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
       for(k in which(!is_done_or_fail)){
         # we need to set x_omit if not yet set
         x = x_all[[k]]
+        
+        if(length(x) == 0){
+          #length-0: OK
+          next
+        }
 
         is_num = is.numeric(x) || is.logical(x)
 
@@ -4881,7 +4831,11 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
 
 
           if(any(x_omit[[k]] < value)){
-            all_reasons[[k]][i] = paste0(msg, "strictly lower than ", signif_plus(value, 5, commas = FALSE))
+            all_reasons[[k]][i] = paste0(
+              msg, "strictly lower than ", 
+              signif_plus(value, 5, commas = FALSE), 
+              if(length(x_omit[[k]]) <= 5) paste0(" (", paste(x_omit[[k]][x_omit[[k]] < value], collapse = ", "), ")")
+            )
             is_done_or_fail[k] = TRUE
             next
           }
@@ -4896,7 +4850,10 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
 
           if(any(x_omit[[k]] <= value)){
             if(any(x_omit[[k]] < value)){
-              all_reasons[[k]][i] = paste0(msg, "lower than ", signif_plus(value, 5, commas = FALSE))
+              all_reasons[[k]][i] = paste0(
+                msg, "lower than ", signif_plus(value, 5, commas = FALSE),
+                if(length(x_omit[[k]]) <= 5) paste0(" (", paste(x_omit[[k]][x_omit[[k]] < value], collapse = ", "), ")")
+              )
             } else {
               all_reasons[[k]][i] = paste0(msg, "equal to ", signif_plus(value, 5, commas = FALSE), " (while it should be *striclty* greater than it)")
             }
@@ -4915,7 +4872,10 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
           }
 
           if(any(x_omit[[k]] > value)){
-            all_reasons[[k]][i] = paste0(msg, "strictly greater than ", signif_plus(value, 5, commas = FALSE))
+            all_reasons[[k]][i] = paste0(
+              msg, "strictly greater than ", signif_plus(value, 5, commas = FALSE),
+              if(length(x_omit[[k]]) <= 5) paste0(" (", paste(x_omit[[k]][x_omit[[k]] > value], collapse = ", "), ")")
+            )
             is_done_or_fail[k] = TRUE
             next
           }
@@ -4930,7 +4890,10 @@ check_arg_core = function(.x, .type, .x1, .x2, .x3, .x4, .x5, .x6, .x7, .x8, .x9
 
           if(any(x_omit[[k]] >= value)){
             if(any(x_omit[[k]] > value)){
-              all_reasons[[k]][i] = paste0(msg, "greater than ", signif_plus(value, 5, commas = FALSE))
+              all_reasons[[k]][i] = paste0(
+                msg, "greater than ", signif_plus(value, 5, commas = FALSE),
+                if(length(x_omit[[k]]) <= 5) paste0(" (", paste(x_omit[[k]][x_omit[[k]] > value], collapse = ", "), ")")
+              )
             } else {
               all_reasons[[k]][i] = paste0(msg, "equal to ", signif_plus(value, 5, commas = FALSE), " (while it should be *striclty* lower than it)")
             }
